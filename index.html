@@ -1,0 +1,264 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="description" content="Sistema de Registro de Asistencia – ITSQMET">
+  <meta http-equiv="X-UA-Compatible" content="IE=edge">
+  <meta http-equiv="Content-Security-Policy" content="frame-ancestors 'self'">
+  <title>Registro de Asistencia – ITSQMET</title>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@400;600;700;800&family=Open+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+  <div class="bg-blob bg-blob--tl" aria-hidden="true"></div>
+  <div class="bg-blob bg-blob--br" aria-hidden="true"></div>
+
+  <div class="card" role="main">
+
+    <header class="header" role="banner">
+      <div class="header__orb header__orb--1" aria-hidden="true"></div>
+      <div class="header__orb header__orb--2" aria-hidden="true"></div>
+      <div class="header__orb header__orb--3" aria-hidden="true"></div>
+
+      <div class="logo-area">
+        <div class="logo-icon" aria-label="Logo ITSQMET">
+          <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden="true">
+            <path d="M24 8L4 18l20 10 20-10L24 8z" fill="#0a2d6e"/>
+            <path d="M10 23v10c0 4 6.268 7 14 7s14-3 14-7V23" stroke="#0a2d6e" stroke-width="2.5" stroke-linecap="round"/>
+            <path d="M40 18v10" stroke="#c0161b" stroke-width="2.5" stroke-linecap="round"/>
+            <circle cx="40" cy="30" r="2.5" fill="#c0161b"/>
+          </svg>
+        </div>
+        <div class="logo-text">
+          <div class="sigla">ITSQMET</div>
+          <div class="nombre">Instituto Tecnológico Universitario<br>Quito Metropolitano</div>
+        </div>
+      </div>
+
+      <h1 class="header__title">Registro de Asistencia</h1>
+      <p class="header__sub">Completa los campos para confirmar tu presencia</p>
+    </header>
+
+    <div class="divider-bar" aria-hidden="true"></div>
+
+    <div class="body">
+
+      <div class="security-badge" role="note" aria-label="Formulario seguro">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <path d="M12 22s8-4 8-10V5l-8-3-8 3v7c0 6 8 10 8 10z"/>
+        </svg>
+        Formulario seguro · Solo se permite un registro por sesión
+      </div>
+
+      <div class="already-banner" id="alreadyBanner" role="alert" aria-live="assertive">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        <div>
+          <strong>Ya registraste tu asistencia.</strong><br>
+          <span class="already-detail" style="font-weight:400;font-size:.78rem;"></span>
+        </div>
+      </div>
+
+      <div class="sesion-banner" id="sesionBanner" role="alert" aria-live="assertive">
+        <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none"
+             stroke="currentColor" stroke-width="2" stroke-linecap="round"
+             stroke-linejoin="round" aria-hidden="true">
+          <rect x="3" y="11" width="18" height="11" rx="2" ry="2"/>
+          <path d="M7 11V7a5 5 0 0110 0v4"/>
+        </svg>
+        <div>
+          <strong>Registro no disponible</strong><br>
+          <span class="sesion-detail" style="font-weight:400;font-size:.78rem;"></span>
+        </div>
+      </div>
+
+      <form id="asistForm" novalidate autocomplete="off" spellcheck="false">
+
+        <div class="field">
+          <label for="cedula">Número de Cédula</label>
+          <div class="input-wrap">
+            <input
+              type="text"
+              id="cedula"
+              name="cedula"
+              placeholder="Ej: 1712345678"
+              maxlength="10"
+              inputmode="numeric"
+              autocomplete="off"
+              aria-required="true"
+              aria-describedby="cedulaHint cedulaErr"
+            >
+
+            <svg class="field-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <rect x="2" y="5" width="20" height="14" rx="2"/>
+              <circle cx="8" cy="12" r="2"/>
+              <path d="M14 9h4M14 12h4M14 15h2"/>
+            </svg>
+
+            <svg class="status-icon status-icon--ok" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20 6L9 17l-5-5"/>
+            </svg>
+
+            <svg class="status-icon status-icon--err" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+
+          <div class="cedula-progress" aria-hidden="true">
+            <div class="cedula-progress__bar" id="cedulaBar"></div>
+          </div>
+
+          <div class="error-msg" id="cedulaErr" role="alert" aria-live="polite"></div>
+          <div class="hint" id="cedulaHint">Solo dígitos, sin guiones · 10 caracteres · Validación automática</div>
+        </div>
+
+        <div class="field">
+          <label for="nombre">Nombres</label>
+          <div class="input-wrap">
+            <input
+              type="text"
+              id="nombre"
+              name="nombre"
+              placeholder="Se llenará automáticamente"
+              readonly
+            >
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="carrera">Carrera</label>
+          <div class="input-wrap">
+            <input
+              type="text"
+              id="carrera"
+              name="carrera"
+              placeholder="Se llenará automáticamente"
+              readonly
+            >
+          </div>
+        </div>
+
+        <div class="field">
+          <label for="telegram">Usuario de Telegram</label>
+          <div class="input-wrap">
+            <input
+              type="text"
+              id="telegram"
+              name="telegram"
+              placeholder="Ej: @mi_usuario"
+              maxlength="34"
+              autocomplete="off"
+              aria-required="true"
+              aria-describedby="telegramHint telegramErr"
+            >
+
+            <svg class="field-icon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M22 2L11 13"/>
+              <path d="M22 2L15 22 11 13 2 9l20-7z"/>
+            </svg>
+
+            <svg class="status-icon status-icon--ok" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <path d="M20 6L9 17l-5-5"/>
+            </svg>
+
+            <svg class="status-icon status-icon--err" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+              <circle cx="12" cy="12" r="10"/>
+              <line x1="12" y1="8" x2="12" y2="12"/>
+              <line x1="12" y1="16" x2="12.01" y2="16"/>
+            </svg>
+          </div>
+
+          <div class="error-msg" id="telegramErr" role="alert" aria-live="polite"></div>
+          <div class="hint" id="telegramHint">El @ se añade automáticamente · 5 a 32 caracteres</div>
+        </div>
+
+        <button type="submit" class="btn" id="submitBtn" aria-label="Registrar asistencia">
+          <div id="btnSpinner" class="spinner" style="display:none;" aria-hidden="true"></div>
+          <svg id="btnIcon" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+            <path d="M9 12l2 2 4-4"/>
+            <circle cx="12" cy="12" r="10"/>
+          </svg>
+          <span id="btnText">Registrar Asistencia</span>
+        </button>
+
+      </form>
+    </div>
+
+    <footer class="footer">
+      <strong>ITSQMET</strong> · Sistema de Control de Asistencia<br>
+      Av. Mariscal Sucre – Quito, Ecuador &nbsp;·&nbsp; itsqmet.edu.ec
+    </footer>
+
+  </div>
+
+  <div
+    class="modal-overlay"
+    id="modalOverlay"
+    role="dialog"
+    aria-modal="true"
+    aria-labelledby="modalTitle"
+    aria-describedby="modalDesc"
+  >
+    <div class="modal">
+      <div class="modal__top">
+        <div class="modal__top-orb modal__top-orb--1" aria-hidden="true"></div>
+        <div class="modal__top-orb modal__top-orb--2" aria-hidden="true"></div>
+
+        <div class="check-circle" aria-hidden="true">
+          <div class="check-circle__ring"></div>
+          <svg viewBox="0 0 24 24" fill="none" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20 6L9 17l-5-5"/>
+          </svg>
+        </div>
+
+        <h2 id="modalTitle">¡Asistencia Registrada!</h2>
+        <p id="modalDesc">Tu presencia ha sido confirmada exitosamente</p>
+      </div>
+
+      <div class="modal__body">
+        <div class="modal__info" aria-label="Datos registrados">
+          <div class="modal__info-row">
+            <span>Cédula:</span>
+            <span id="modalCedula">—</span>
+          </div>
+
+          <div class="modal__info-row">
+            <span>Nombre:</span>
+            <span id="modalNombre">—</span>
+          </div>
+
+          <div class="modal__info-row">
+            <span>Carrera:</span>
+            <span id="modalCarrera">—</span>
+          </div>
+
+          <div class="modal__info-row">
+            <span>Telegram:</span>
+            <span id="modalTelegram">—</span>
+          </div>
+        </div>
+
+        <div class="modal__timestamp" aria-label="Fecha y hora de registro">
+          <span id="modalTs"></span>
+        </div>
+
+        <button class="modal__btn" id="modalClose" aria-label="Cerrar confirmación">
+          Entendido ✓
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <script type="module" src="app.js"></script>
+</body>
+</html>
