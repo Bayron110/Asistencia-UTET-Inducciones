@@ -20,9 +20,6 @@
     <div class="login-noise" aria-hidden="true"></div>
 
     <div class="login-box">
-      <button onclick="history.back()" class="action-btn">
-        ⬅ Volver
-      </button>
 
       <div class="login-logo" aria-label="Logo ITSQMET">
         <svg viewBox="0 0 48 48" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -114,6 +111,7 @@
           </svg>
           Registros
         </a>
+        
 
         <a class="nav-item" data-tab="sesion" href="#">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -145,6 +143,17 @@
             <path d="M16 3.13a4 4 0 010 7.75" />
           </svg>
           Grupos
+        </a>
+        
+        <a class="nav-item" data-tab="dashboard" href="#">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+              stroke-linecap="round" stroke-linejoin="round">
+            <rect x="2" y="3" width="8" height="8" rx="1.5"/>
+            <rect x="14" y="3" width="8" height="8" rx="1.5"/>
+            <rect x="2" y="14" width="8" height="7" rx="1.5"/>
+            <rect x="14" y="14" width="8" height="7" rx="1.5"/>
+          </svg>
+          Dashboard
         </a>
       </nav>
 
@@ -439,6 +448,9 @@
         </div>
       </section>
 
+            <section class="tab-panel" id="tab-dashboard">
+        <!-- El contenido se monta dinámicamente por dashboard.js -->
+      </section>
     </main>
   </div>
 

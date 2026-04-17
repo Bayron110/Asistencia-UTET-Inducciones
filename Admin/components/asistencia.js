@@ -1,36 +1,32 @@
 import {
-  db as userDb,
-  ref as userRef,
-  onValue as userOnValue,
-  remove as userRemove,
-  set as userSet
-} from '../../Firebase/firebase.js';
-
-import {
   db as adminDb,
   ref as adminRef,
   onValue as adminOnValue,
-  update as adminUpdate
+  update as adminUpdate,
+  remove as adminRemove
 } from '../../Firebase/firebase-admin.js';
 
-const DB_ASIST = 'asistencias';
 const DB_ADMIN_ESTUDIANTES = 'admin_estudiantes';
 
 const $ = id => document.getElementById(id);
 
-const statTotal = $('statTotal');
-const statHoy = $('statHoy');
+const statTotal    = $('statTotal');
+const statHoy      = $('statHoy');
 const statReciente = $('statReciente');
-const tableBody = $('tableBody');
-const emptyRow = $('emptyRow');
-const searchInput = $('searchInput');
-const exportBtn = $('exportBtn');
+const tableBody    = $('tableBody');
+const emptyRow     = $('emptyRow');
+const searchInput  = $('searchInput');
+const exportBtn    = $('exportBtn');
 
-let registros = {};
-let adminEstudiantes = {};
-let asistenciasUsuario = {};
-let lastKeys = [];
+let registros          = {};
+let adminEstudiantes   = {};
+let lastKeys           = [];
 let listenersIniciados = false;
+let filtroActivo       = 'todos'; // 'todos' | 'presentes' | 'ausentes'
+
+/* ══════════════════════════════════════════════════════════════
+   UTILIDADES
+══════════════════════════════════════════════════════════════ */
 
 function escHtml(str) {
   return String(str)
@@ -46,9 +42,9 @@ function toast(msg, type = 'info') {
 
   const icons = {
     success: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>',
-    warn: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
-    error: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
-    info: '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
+    warn:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"   stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>',
+    error:   '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"   stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>',
+    info:    '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"   stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>'
   };
 
   const t = document.createElement('div');
@@ -63,22 +59,101 @@ function toast(msg, type = 'info') {
   }, 3500);
 }
 
+/* ══════════════════════════════════════════════════════════════
+   FILTER BAR — montar y bindear
+══════════════════════════════════════════════════════════════ */
+
+function montarFilterBar() {
+  // Insertar barra de filtros encima de la tabla (si no existe aún)
+  if ($('filterBarRegistros')) return;
+
+  const tableWrap = document.querySelector('#tab-registros .table-wrap');
+  if (!tableWrap) return;
+
+  const bar = document.createElement('div');
+  bar.className = 'filter-bar';
+  bar.id        = 'filterBarRegistros';
+
+  bar.innerHTML = `
+    <button class="filter-btn filter-btn--todos active-filter-todos" data-filtro="todos">
+      <span class="filter-btn__dot"></span>
+      Todos
+      <span class="filter-btn__count" id="filterCountTodos">0</span>
+    </button>
+    <button class="filter-btn filter-btn--presentes" data-filtro="presentes">
+      <span class="filter-btn__dot"></span>
+      Registrados
+      <span class="filter-btn__count" id="filterCountPresentes">0</span>
+    </button>
+    <button class="filter-btn filter-btn--ausentes" data-filtro="ausentes">
+      <span class="filter-btn__dot"></span>
+      Pendientes
+      <span class="filter-btn__count" id="filterCountAusentes">0</span>
+    </button>
+  `;
+
+  // Insertar antes del table-header
+  const tableHeader = tableWrap.querySelector('.table-header');
+  if (tableHeader) {
+    tableWrap.insertBefore(bar, tableHeader);
+  } else {
+    tableWrap.prepend(bar);
+  }
+
+  // Bind de clicks
+  bar.querySelectorAll('.filter-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      filtroActivo = btn.dataset.filtro;
+
+      // Actualizar clases activas
+      bar.querySelectorAll('.filter-btn').forEach(b => {
+        b.className = b.className
+          .replace(/active-filter-\S+/g, '')
+          .trim();
+      });
+
+      btn.classList.add('active-filter-' + filtroActivo);
+
+      renderTable(registros, searchInput?.value?.trim().toLowerCase() || '');
+    });
+  });
+}
+
+function actualizarCountsFiltro(data) {
+  const entries    = Object.values(data);
+  const total      = entries.length;
+  const presentes  = entries.filter(v => v.asistencia === true).length;
+  const ausentes   = total - presentes;
+
+  const elTodos     = $('filterCountTodos');
+  const elPresentes = $('filterCountPresentes');
+  const elAusentes  = $('filterCountAusentes');
+
+  if (elTodos)     elTodos.textContent     = total;
+  if (elPresentes) elPresentes.textContent = presentes;
+  if (elAusentes)  elAusentes.textContent  = ausentes;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   RECOMPUTAR Y RENDERIZAR
+══════════════════════════════════════════════════════════════ */
+
 function recomputeRegistros() {
   const merged = {};
 
   Object.entries(adminEstudiantes).forEach(([cedula, adminData]) => {
-    const asist = asistenciasUsuario[cedula] || {};
-
     merged[cedula] = {
       cedula,
-      nombre: adminData.nombres || adminData.nombre || '',
-      carrera: adminData.carrera || '',
-      telegram: asist.telegram || adminData.telegram || '',
-      asistencia: asist.asistencia === true
+      nombre:     adminData.nombres  || adminData.nombre  || '',
+      carrera:    adminData.carrera  || '',
+      telegram:   adminData.telegram || '',
+      asistencia: adminData.asistencia === true
     };
   });
 
   registros = merged;
+  montarFilterBar();
+  actualizarCountsFiltro(registros);
   renderTable(registros, searchInput?.value?.trim().toLowerCase() || '');
   updateStats(registros);
 }
@@ -86,20 +161,28 @@ function recomputeRegistros() {
 function renderTable(data, filter = '') {
   if (!tableBody) return;
 
-  const entries = Object.entries(data);
+  let entries = Object.entries(data);
 
+  // Aplicar filtro activo
+  if (filtroActivo === 'presentes') {
+    entries = entries.filter(([, v]) => v.asistencia === true);
+  } else if (filtroActivo === 'ausentes') {
+    entries = entries.filter(([, v]) => v.asistencia !== true);
+  }
+
+  // Aplicar búsqueda
   const filtrado = filter
     ? entries.filter(([k, v]) =>
         k.toLowerCase().includes(filter) ||
-        (v.nombre || '').toLowerCase().includes(filter) ||
-        (v.carrera || '').toLowerCase().includes(filter) ||
+        (v.nombre   || '').toLowerCase().includes(filter) ||
+        (v.carrera  || '').toLowerCase().includes(filter) ||
         (v.telegram || '').toLowerCase().includes(filter)
       )
     : entries;
 
-  const currentKeys = entries.map(([k]) => k);
-  const newKeys = currentKeys.filter(k => !lastKeys.includes(k));
-  lastKeys = currentKeys;
+  const currentKeys = Object.keys(data);
+  const newKeys     = currentKeys.filter(k => !lastKeys.includes(k));
+  lastKeys          = currentKeys;
 
   if (filtrado.length === 0) {
     tableBody.innerHTML = '';
@@ -110,11 +193,14 @@ function renderTable(data, filter = '') {
   tableBody.innerHTML = '';
 
   filtrado.forEach(([cedula, d], i) => {
-    const isNew = newKeys.includes(cedula);
+    const isNew      = newKeys.includes(cedula);
     const asistencia = d.asistencia === true;
 
     const tr = document.createElement('tr');
     if (isNew) tr.classList.add('row-new');
+
+    // Pintar fila verde si el estudiante ya registró asistencia
+    if (asistencia) tr.classList.add('row-presente');
 
     tr.innerHTML =
       '<td>' + (i + 1) + '</td>' +
@@ -122,12 +208,12 @@ function renderTable(data, filter = '') {
         '<span class="badge-cedula">' + escHtml(cedula) + '</span>' +
         (isNew ? '<span class="tag-nuevo">NUEVO</span>' : '') +
       '</td>' +
-      '<td>' + escHtml(d.nombre || '\u2013') + '</td>' +
-      '<td>' + escHtml(d.carrera || '\u2013') + '</td>' +
-      '<td class="badge-telegram">' + escHtml(d.telegram || '\u2013') + '</td>' +
+      '<td>' + escHtml(d.nombre   || '–') + '</td>' +
+      '<td>' + escHtml(d.carrera  || '–') + '</td>' +
+      '<td class="badge-telegram">' + escHtml(d.telegram || '–') + '</td>' +
       '<td>' +
         '<span class="' + (asistencia ? 'tag-asistencia-ok' : 'tag-asistencia-no') + '">' +
-          (asistencia ? '\u2714' : '\u2716') +
+          (asistencia ? 'Presente' : 'Pendiente') +
         '</span>' +
       '</td>' +
       '<td>' +
@@ -143,23 +229,26 @@ function renderTable(data, filter = '') {
 }
 
 function updateStats(data) {
-  const entries = Object.values(data);
-  const total = entries.length;
+  const entries    = Object.values(data);
+  const total      = entries.length;
   const asistieron = entries.filter(v => v.asistencia === true).length;
   const pendientes = total - asistieron;
 
-  if (statTotal) statTotal.textContent = total;
-  if (statHoy) statHoy.textContent = asistieron;
+  if (statTotal)    statTotal.textContent    = total;
+  if (statHoy)      statHoy.textContent      = asistieron;
   if (statReciente) statReciente.textContent = pendientes;
 }
 
+/* ══════════════════════════════════════════════════════════════
+   REINICIAR ASISTENCIA
+══════════════════════════════════════════════════════════════ */
+
 async function deleteRegistro(cedula) {
-  if (!confirm('Reiniciar asistencia de la cedula ' + cedula + '?')) return;
+  if (!confirm('¿Reiniciar asistencia de la cédula ' + cedula + '?')) return;
 
   try {
-    await userRemove(userRef(userDb, DB_ASIST + '/' + cedula));
     await adminUpdate(adminRef(adminDb, DB_ADMIN_ESTUDIANTES + '/' + cedula), {
-      telegram: '',
+      telegram:   '',
       asistencia: false
     });
 
@@ -170,6 +259,10 @@ async function deleteRegistro(cedula) {
   }
 }
 
+/* ══════════════════════════════════════════════════════════════
+   EXPORTAR EXCEL
+══════════════════════════════════════════════════════════════ */
+
 function exportarExcel() {
   const entries = Object.entries(registros);
 
@@ -179,17 +272,17 @@ function exportarExcel() {
   }
 
   if (typeof XLSX === 'undefined') {
-    toast('La libreria XLSX no esta cargada en el HTML.', 'error');
+    toast('La librería XLSX no está cargada en el HTML.', 'error');
     return;
   }
 
   const rows = entries.map(([cedula, d], i) => ({
-    '#': i + 1,
-    'Cedula': cedula,
-    'Nombre': d.nombre || '',
-    'Carrera': d.carrera || '',
-    'Telegram': d.telegram || '',
-    'Asistencia': d.asistencia === true ? 'Si' : 'No'
+    '#':          i + 1,
+    'Cédula':     cedula,
+    'Nombre':     d.nombre   || '',
+    'Carrera':    d.carrera  || '',
+    'Telegram':   d.telegram || '',
+    'Asistencia': d.asistencia === true ? 'Sí' : 'No'
   }));
 
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -238,7 +331,7 @@ function cerrarManualModal() {
 
 function mostrarErrManual(msg) {
   if (!manualErr) return;
-  manualErr.textContent = msg;
+  manualErr.textContent   = msg;
   manualErr.style.display = 'block';
 }
 
@@ -248,16 +341,16 @@ function validarCedulaEnVivo() {
 
   if (!cedula) {
     manualCedulaHint.textContent = '';
-    manualCedulaHint.className = 'manual-field-hint';
+    manualCedulaHint.className   = 'manual-field-hint';
     return;
   }
 
   if (adminEstudiantes[cedula]) {
-    manualCedulaHint.textContent = '\u26a0 Esta cedula ya existe en la base de datos';
-    manualCedulaHint.className = 'manual-field-hint err';
+    manualCedulaHint.textContent = '⚠ Esta cédula ya existe en la base de datos';
+    manualCedulaHint.className   = 'manual-field-hint err';
   } else {
-    manualCedulaHint.textContent = '\u2714 Cedula disponible';
-    manualCedulaHint.className = 'manual-field-hint ok';
+    manualCedulaHint.textContent = '✔ Cédula disponible';
+    manualCedulaHint.className   = 'manual-field-hint ok';
   }
 }
 
@@ -269,42 +362,32 @@ async function confirmarRegistroManual() {
   const nombre   = manualNombre?.value.trim()   || '';
   const carrera  = manualCarrera?.value.trim()  || '';
   const telegram = manualTelegram?.value.trim() || '';
-  const asistio  = manualAsistencia?.checked === true;
+  const asistio  = manualAsistencia?.checked    === true;
 
-  if (!cedula)  { mostrarErrManual('La cedula es obligatoria.');  manualCedula?.focus();  return; }
+  if (!cedula)  { mostrarErrManual('La cédula es obligatoria.');  manualCedula?.focus();  return; }
   if (!nombre)  { mostrarErrManual('El nombre es obligatorio.');  manualNombre?.focus();  return; }
   if (!carrera) { mostrarErrManual('La carrera es obligatoria.'); manualCarrera?.focus(); return; }
 
   if (adminEstudiantes[cedula]) {
-    mostrarErrManual('La cedula "' + cedula + '" ya existe. Usa "Reiniciar" si quieres actualizarla.');
+    mostrarErrManual('La cédula "' + cedula + '" ya existe. Usa "Reiniciar" si quieres actualizarla.');
     manualCedula?.focus();
     return;
   }
 
   if (confirmarManualBtn) {
-    confirmarManualBtn.disabled = true;
+    confirmarManualBtn.disabled    = true;
     confirmarManualBtn.textContent = 'Guardando...';
   }
 
   try {
-    // 1. Guardar en admin_estudiantes (aparece en la lista de registros)
     await adminUpdate(adminRef(adminDb, DB_ADMIN_ESTUDIANTES + '/' + cedula), {
       nombres:            nombre,
       carrera,
       telegram:           telegram || '',
-      asistencia:         asistio
+      asistencia:         asistio,
+      registradoPorAdmin: true,
+      fechaRegistro:      Date.now()
     });
-
-    // 2. Si se marcó asistencia, escribir también en asistencias (base usuario)
-    if (asistio) {
-      await userSet(userRef(userDb, DB_ASIST + '/' + cedula), {
-        cedula,
-        telegram:           telegram || '',
-        asistencia:         true,
-        registradoPorAdmin: true,
-        fechaRegistro:      Date.now()
-      });
-    }
 
     toast('Estudiante "' + nombre + '" registrado correctamente.', 'success');
     cerrarManualModal();
@@ -314,7 +397,7 @@ async function confirmarRegistroManual() {
     mostrarErrManual('Error al guardar en la base de datos. Intenta de nuevo.');
   } finally {
     if (confirmarManualBtn) {
-      confirmarManualBtn.disabled = false;
+      confirmarManualBtn.disabled  = false;
       confirmarManualBtn.innerHTML =
         '<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">' +
           '<path d="M12 5v14"/><path d="M5 12h14"/>' +
@@ -367,11 +450,6 @@ function iniciarListenersAsistencia() {
 
   adminOnValue(adminRef(adminDb, DB_ADMIN_ESTUDIANTES), snapshot => {
     adminEstudiantes = snapshot.val() || {};
-    recomputeRegistros();
-  });
-
-  userOnValue(userRef(userDb, DB_ASIST), snapshot => {
-    asistenciasUsuario = snapshot.val() || {};
     recomputeRegistros();
   });
 }
