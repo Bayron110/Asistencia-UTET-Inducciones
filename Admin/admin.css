@@ -2138,3 +2138,27 @@ a { text-decoration: none; color: inherit; }
   .stats-row { grid-template-columns: 1fr; }
   .dash-kpi-row { grid-template-columns: 1fr; }
 }
+/* URL BOX */
+.url-box{
+  display:flex;
+  gap:12px;
+  align-items:center;
+  margin-top:16px;
+  flex-wrap:wrap;
+}
+
+.url-box input{
+  flex:1;
+  min-width:0;
+  background:#0f172a;
+  border:1px solid rgba(255,255,255,.08);
+  color:#e2e8f0;
+  border-radius:14px;
+  padding:14px 16px;
+  font-size:14px;
+  outline:none;
+}
+
+.url-box input:focus{
+  border-color:#3b82f6;
+}

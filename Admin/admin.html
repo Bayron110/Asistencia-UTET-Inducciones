@@ -378,10 +378,41 @@
               </div>
             </div>
           </div>
+<!-- CARD URL FORMULARIO -->
+<div class="sesion-card">
+  <div class="sesion-card__header">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+      stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+      <path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4" />
+      <path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 20" />
+    </svg>
+    URL del formulario
+  </div>
 
+  <p class="sesion-hint">
+    Comparte este enlace con los estudiantes para registrar asistencia.
+  </p>
+
+  <div class="url-box">
+    <input
+      type="text"
+      id="formUrlInput"
+      readonly
+      value="https://registroinduccionesitsqmet.netlify.app/"
+    >
+
+    <button class="action-btn action-btn--timer" id="copyUrlBtn">
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+      </svg>
+      Copiar URL
+    </button>
+  </div>
+</div>
         </div>
       </section>
-
       <!-- TAB: EXCEL -->
       <section class="tab-panel" id="tab-excel">
         <div class="table-wrap">
@@ -687,7 +718,40 @@
       });
     });
   </script>
+<script>
+  const copyUrlBtn = document.getElementById('copyUrlBtn');
+  const formUrlInput = document.getElementById('formUrlInput');
 
+  if (copyUrlBtn) {
+    copyUrlBtn.addEventListener('click', async () => {
+      try {
+        await navigator.clipboard.writeText(formUrlInput.value);
+
+        copyUrlBtn.innerHTML = `
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <polyline points="20 6 9 17 4 12"></polyline>
+          </svg>
+          ¡Copiado!
+        `;
+
+        setTimeout(() => {
+          copyUrlBtn.innerHTML = `
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+              stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+              <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+            </svg>
+            Copiar URL
+          `;
+        }, 2000);
+
+      } catch (err) {
+        alert('No se pudo copiar la URL');
+      }
+    });
+  }
+</script>
   <script type="module" src="admin.js"></script>
 </body>
 
