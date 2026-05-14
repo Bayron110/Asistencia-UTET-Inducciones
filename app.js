@@ -11,7 +11,7 @@ import {
 const CONFIG = {
   STORAGE_KEY: 'itsqmet_asist_submitted',
   RATE_LIMIT_KEY: 'itsqmet_last_attempt',
-  RATE_LIMIT_MS: 60_000,
+  RATE_LIMIT_MS: 5000,
   SESSION_TTL_MS: 12 * 60 * 60 * 1000,
   MAX_CEDULA_LEN: 10,
   MIN_CEDULA_LEN: 10,
@@ -497,75 +497,147 @@ function bindFormSubmit() {
       return;
     }
 
+    // Rate limit SOLO para spam real
     if (checkRateLimit()) {
-      showToast('Espera un momento antes de intentar de nuevo.', 'warn');
+      showToast('Espera unos segundos antes de volver a intentar.', 'warn');
       return;
     }
 
-    const cedula   = sanitize(cedulaInput?.value   || '');
+    const cedula   = sanitize(cedulaInput?.value || '');
     const telegram = normalizarTelegram(telegramInput?.value || '');
-    const nombre   = sanitize(nombreInput?.value   || '');
-    const carrera  = sanitize(carreraInput?.value  || '');
+    const nombre   = sanitize(nombreInput?.value || '');
+    const carrera  = sanitize(carreraInput?.value || '');
 
     let hasError = false;
 
+    // ───── Validar cédula ─────
     if (!validarCedulaEC(cedula)) {
-      setFieldState(cedulaInput, cedulaErr, false, 'Ingresa una cédula ecuatoriana válida');
+      setFieldState(
+        cedulaInput,
+        cedulaErr,
+        false,
+        'Ingresa una cédula ecuatoriana válida'
+      );
+
       cedulaInput?.focus();
       hasError = true;
     }
 
+    // ───── Validar estudiante ─────
     if (!estudianteActual || !nombre || !carrera) {
-      setFieldState(cedulaInput, cedulaErr, false, 'La cédula no está registrada por el administrador');
+      setFieldState(
+        cedulaInput,
+        cedulaErr,
+        false,
+        'La cédula no está registrada por el administrador'
+      );
+
       if (!hasError) cedulaInput?.focus();
       hasError = true;
     }
 
+    // ───── Validar Telegram ─────
     if (!validarTelegram(telegram)) {
-      setFieldState(telegramInput, telegramErr, false, 'Formato de Telegram inválido. Ej: @usuario');
+      setFieldState(
+        telegramInput,
+        telegramErr,
+        false,
+        'Formato inválido. Ej: @usuario'
+      );
+
       if (!hasError) telegramInput?.focus();
       hasError = true;
     }
 
+    // ❌ YA NO BLOQUEAMOS POR ERRORES
     if (hasError) {
-      updateRateLimit();
       return;
     }
 
     setBtnLoading(true);
 
     try {
-      // Re-verificar sesión antes de escribir
+
+      // ───── Verificar sesión ─────
       const cfgSnap = await get(ref(db, CONFIG.DB_CONFIG_PATH));
+
       aplicarEstadoSesion(cfgSnap.val());
 
-      if (!sesionEstaActiva(sesionActual) || submitBtn?.disabled || cedulaInput?.disabled) {
+      if (
+        !sesionEstaActiva(sesionActual) ||
+        submitBtn?.disabled ||
+        cedulaInput?.disabled
+      ) {
         setBtnLoading(false);
         return;
       }
 
-      const existe = await get(ref(db, `${CONFIG.DB_ADMIN_PATH}/${cedula}`));
-      const yaAsistio = existe.exists() && existe.val()?.asistencia === true;
+      // ───── Revisar si ya registró ─────
+      const existe = await get(
+        ref(db, `${CONFIG.DB_ADMIN_PATH}/${cedula}`)
+      );
+
+      const yaAsistio =
+        existe.exists() &&
+        existe.val()?.asistencia === true;
 
       if (yaAsistio) {
+
         setBtnLoading(false);
-        setFieldState(cedulaInput, cedulaErr, false, 'Esta cédula ya registró asistencia');
-        showToast('Esta cédula ya registró asistencia.', 'warn');
+
+        setFieldState(
+          cedulaInput,
+          cedulaErr,
+          false,
+          'Esta cédula ya registró asistencia'
+        );
+
+        showToast(
+          'Esta cédula ya registró asistencia.',
+          'warn'
+        );
+
         return;
       }
 
-      await actualizarAdminEstudiante(cedula, nombre, carrera, telegram);
+      // ───── Guardar asistencia ─────
+      await actualizarAdminEstudiante(
+        cedula,
+        nombre,
+        carrera,
+        telegram
+      );
 
+      // ───── Guardar estado local ─────
       marcarEnviado(cedula, telegram);
+
+      // ✅ RATE LIMIT SOLO DESPUÉS DEL ÉXITO
+      updateRateLimit();
+
       setBtnLoading(false);
+
       setBtnSuccess();
 
-      setTimeout(() => openModal(cedula, nombre, carrera, telegram), 600);
+      setTimeout(() => {
+        openModal(
+          cedula,
+          nombre,
+          carrera,
+          telegram
+        );
+      }, 600);
+
     } catch (err) {
+
       console.error('Firebase error:', err);
-      updateRateLimit();
+
+      // ❌ YA NO BLOQUEAMOS POR ERROR FIREBASE
       setBtnLoading(false);
-      showToast('Error al registrar en Firebase.', 'error');
+
+      showToast(
+        'Error al registrar en Firebase. Intenta nuevamente.',
+        'error'
+      );
     }
   });
 }
