@@ -2162,3 +2162,273 @@ a { text-decoration: none; color: inherit; }
 .url-box input:focus{
   border-color:#3b82f6;
 }
+/* Variables de color para la barra de progreso (usa las tuyas si ya existen) */
+:root {
+  --color-ok:   #22c55e;
+  --color-warn: #f59e0b;
+  --color-bad:  #ef4444;
+}
+
+/* ── Grid de cards ── */
+.grupos-grid {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+/* ── Card principal ── */
+.grupo-card--v2 {
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 14px;
+  overflow: hidden;
+  transition: border-color .2s, box-shadow .2s;
+}
+
+.grupo-card--v2:hover {
+  border-color: #475569;
+  box-shadow: 0 4px 24px rgba(0,0,0,.35);
+}
+
+/* ── Cabecera ── */
+.grupo-card__header-v2 {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 18px 20px 14px;
+}
+
+.grupo-card__icon-wrap {
+  flex-shrink: 0;
+  width: 40px;
+  height: 40px;
+  border-radius: 10px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+}
+
+.grupo-card__icon-wrap svg {
+  width: 20px;
+  height: 20px;
+}
+
+.grupo-card__title-block {
+  flex: 1;
+  min-width: 0;
+}
+
+.grupo-card__name {
+  font-size: 15px;
+  font-weight: 700;
+  color: #f1f5f9;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.grupo-card__meta {
+  font-size: 12px;
+  color: #64748b;
+  margin-top: 3px;
+}
+
+/* ── Botón toggle (chevron) ── */
+.grupo-card__toggle-v2 {
+  flex-shrink: 0;
+  width: 34px;
+  height: 34px;
+  border-radius: 8px;
+  background: #0f172a;
+  border: 1px solid #334155;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #94a3b8;
+  cursor: pointer;
+  transition: background .15s, color .15s, border-color .15s;
+}
+
+.grupo-card__toggle-v2:hover {
+  background: #1e293b;
+  border-color: #475569;
+  color: #e2e8f0;
+}
+
+.toggle-chevron {
+  width: 16px;
+  height: 16px;
+  transition: transform .25s ease;
+}
+
+/* ── Stats rápidas ── */
+.grupo-card__stats-v2 {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 1px;
+  background: #334155;
+  border-top: 1px solid #334155;
+}
+
+.grupo-stat {
+  background: #1e293b;
+  padding: 12px 16px;
+  text-align: center;
+}
+
+.grupo-stat__num {
+  font-size: 22px;
+  font-weight: 800;
+  color: #e2e8f0;
+  line-height: 1;
+}
+
+.grupo-stat__label {
+  font-size: 11px;
+  color: #64748b;
+  margin-top: 4px;
+  text-transform: uppercase;
+  letter-spacing: .04em;
+}
+
+.grupo-stat--ok .grupo-stat__num  { color: #4ade80; }
+.grupo-stat--bad .grupo-stat__num { color: #f87171; }
+.grupo-stat--pct .grupo-stat__num { color: #60a5fa; }
+
+/* ── Barra de progreso ── */
+.grupo-card__progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 20px;
+  border-top: 1px solid #334155;
+}
+
+.grupo-card__progress-bar {
+  flex: 1;
+  height: 6px;
+  background: #0f172a;
+  border-radius: 999px;
+  overflow: hidden;
+}
+
+.grupo-card__progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  transition: width .4s ease;
+}
+
+.grupo-card__progress-label {
+  font-size: 12px;
+  font-weight: 700;
+  color: #94a3b8;
+  min-width: 34px;
+  text-align: right;
+}
+
+/* ── Cuerpo expandible ── */
+.grupo-card__body {
+  border-top: 1px solid #334155;
+}
+
+/* ── Barra de búsqueda del grupo ── */
+.grupo-search-bar {
+  padding: 14px 16px 10px;
+  background: #0f172a;
+  border-bottom: 1px solid #1e293b;
+}
+
+.grupo-search-wrap {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.grupo-search-icon {
+  position: absolute;
+  left: 12px;
+  width: 16px;
+  height: 16px;
+  color: #475569;
+  pointer-events: none;
+}
+
+.grupo-search-input {
+  width: 100%;
+  background: #1e293b;
+  border: 1px solid #334155;
+  border-radius: 8px;
+  padding: 9px 36px 9px 36px;
+  font-size: 13px;
+  color: #e2e8f0;
+  outline: none;
+  transition: border-color .15s, box-shadow .15s;
+  font-family: inherit;
+}
+
+.grupo-search-input::placeholder {
+  color: #475569;
+}
+
+.grupo-search-input:focus {
+  border-color: #3b82f6;
+  box-shadow: 0 0 0 3px rgba(59,130,246,.15);
+}
+
+/* Botón × para limpiar búsqueda */
+.grupo-search-clear {
+  position: absolute;
+  right: 8px;
+  width: 22px;
+  height: 22px;
+  border-radius: 50%;
+  background: #334155;
+  border: none;
+  display: none;  /* se activa por JS */
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  color: #94a3b8;
+  transition: background .15s, color .15s;
+}
+
+.grupo-search-clear:hover {
+  background: #475569;
+  color: #f1f5f9;
+}
+
+.grupo-search-clear svg {
+  width: 11px;
+  height: 11px;
+}
+
+/* ── Mensaje sin resultados ── */
+.grupo-no-results {
+  display: none;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  padding: 28px 16px;
+  color: #475569;
+  font-size: 14px;
+}
+
+.grupo-no-results svg {
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+}
+
+/* ── Responsive: stats en 2 columnas en móvil ── */
+@media (max-width: 480px) {
+  .grupo-card__stats-v2 {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .grupo-card__header-v2 {
+    padding: 14px 14px 10px;
+  }
+}
