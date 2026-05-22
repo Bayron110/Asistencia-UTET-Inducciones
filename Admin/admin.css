@@ -2432,3 +2432,347 @@ a { text-decoration: none; color: inherit; }
     padding: 14px 14px 10px;
   }
 }
+/* ════════════════════════════════════════════════════
+   GRUPOS + DASHBOARD V2 — pegar al final de admin.css
+════════════════════════════════════════════════════ */
+
+/* ─── CARD GRUPO (tab Grupos) ─────────────────────── */
+.grupos-grid { display: flex; flex-direction: column; gap: 14px; }
+
+.gc-card {
+  position: relative;
+  background: #0d1424;
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 16px;
+  overflow: hidden;
+  transition: border-color .2s, box-shadow .2s;
+}
+.gc-card:hover { border-color: rgba(255,255,255,.14); box-shadow: 0 6px 32px rgba(0,0,0,.4); }
+
+.gc-top-accent { position:absolute; top:0; left:0; right:0; height:2px; }
+
+/* cabecera */
+.gc-header {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  padding: 16px 18px 12px;
+}
+.gc-header-icon {
+  width: 38px; height: 38px; flex-shrink: 0;
+  background: rgba(37,99,235,.1);
+  border: 1px solid rgba(37,99,235,.2);
+  border-radius: 10px;
+  display: flex; align-items: center; justify-content: center;
+  color: #60a5fa;
+}
+.gc-header-icon svg { width: 18px; height: 18px; }
+.gc-header-info { flex: 1; min-width: 0; }
+.gc-header-name {
+  font-size: .92rem; font-weight: 700; color: #f1f5f9;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.gc-header-meta {
+  display: flex; align-items: center; gap: 5px;
+  font-size: .68rem; color: #4a607a;
+  font-family: 'JetBrains Mono', monospace;
+  margin-top: 3px; flex-wrap: wrap;
+}
+.gc-meta-sep { color: #334155; }
+
+/* botón chevron */
+.gc-toggle {
+  flex-shrink: 0;
+  width: 32px; height: 32px;
+  background: rgba(255,255,255,.04);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px;
+  display: flex; align-items: center; justify-content: center;
+  color: #64748b; cursor: pointer;
+  transition: background .15s, color .15s;
+}
+.gc-toggle:hover { background: rgba(255,255,255,.08); color: #e2e8f0; }
+.gc-chevron { width: 15px; height: 15px; transition: transform .25s ease; }
+
+/* stats 4 col */
+.gc-stats {
+  display: grid;
+  grid-template-columns: repeat(4,1fr);
+  border-top: 1px solid rgba(255,255,255,.06);
+}
+.gc-stat {
+  padding: 12px 8px;
+  text-align: center;
+  border-right: 1px solid rgba(255,255,255,.06);
+}
+.gc-stat:last-child { border-right: none; }
+.gc-stat-num { font-size: 1.4rem; font-weight: 800; color: #e2e8f0; line-height: 1; }
+.gc-stat-label { font-size: .6rem; color: #4a607a; margin-top: 4px; text-transform: uppercase; letter-spacing: .05em; }
+.gc-stat--ok  .gc-stat-num { color: #4ade80; }
+.gc-stat--bad .gc-stat-num { color: #f87171; }
+
+/* barra progreso */
+.gc-progress-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 10px 18px;
+  border-top: 1px solid rgba(255,255,255,.06);
+}
+.gc-progress-track { flex: 1; height: 5px; background: rgba(255,255,255,.06); border-radius: 99px; overflow: hidden; }
+.gc-progress-fill  { height: 100%; border-radius: 99px; transition: width .5s ease; }
+.gc-progress-lbl   { font-family: 'JetBrains Mono',monospace; font-size: .72rem; font-weight: 700; min-width: 36px; text-align: right; }
+
+/* cuerpo expandible */
+.gc-body { border-top: 1px solid rgba(255,255,255,.06); }
+
+/* sección carreras */
+.gc-section { background: rgba(15,23,42,.7); border-bottom: 1px solid rgba(255,255,255,.06); padding: 14px 18px; }
+.gc-section-hd {
+  display: flex; align-items: center; gap: 8px;
+  font-size: .75rem; font-weight: 700; color: #60a5fa;
+  margin-bottom: 14px;
+}
+.gc-badge {
+  font-family: 'JetBrains Mono',monospace; font-size: .62rem;
+  background: rgba(37,99,235,.12); border: 1px solid rgba(37,99,235,.22);
+  padding: 1px 8px; border-radius: 99px; color: #60a5fa;
+}
+
+/* mini barras */
+.gc-barras { display: flex; flex-direction: column; gap: 7px; margin-bottom: 16px; }
+.gc-bar-row { display: flex; align-items: center; gap: 8px; }
+.gc-bar-name {
+  flex: 1; min-width: 0; font-size: .71rem; color: #64748b;
+  white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+}
+.gc-bar-track { width: 100px; height: 5px; background: rgba(255,255,255,.06); border-radius: 99px; overflow: hidden; flex-shrink: 0; }
+.gc-bar-fill  { height: 100%; border-radius: 99px; transition: width .5s ease; }
+.gc-bar-pct   { font-family: 'JetBrains Mono',monospace; font-size: .68rem; font-weight: 700; min-width: 34px; text-align: right; flex-shrink: 0; }
+.gc-bar-frac  { font-family: 'JetBrains Mono',monospace; font-size: .63rem; color: #4a607a; min-width: 38px; text-align: right; flex-shrink: 0; }
+
+/* label chips */
+.gc-chips-label { font-size: .63rem; color: #4a607a; font-weight: 600; text-transform: uppercase; letter-spacing: .07em; margin-bottom: 8px; }
+
+/* chips carrera */
+.gc-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.gc-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 12px; border-radius: 99px; cursor: pointer;
+  border: 1px solid var(--cbr, rgba(255,255,255,.1));
+  background: var(--cb, rgba(255,255,255,.04));
+  color: var(--cc, #7a8fa8);
+  font-size: .72rem; font-weight: 600; font-family: inherit;
+  transition: filter .15s, box-shadow .15s;
+  white-space: nowrap;
+}
+.gc-chip:hover { filter: brightness(1.1); }
+.gc-chip--act  { outline: 2px solid currentColor; box-shadow: 0 0 0 4px rgba(255,255,255,.04); }
+.gc-chip-dot   { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.gc-chip-pct   { font-family: 'JetBrains Mono',monospace; font-size: .67rem; background: rgba(0,0,0,.25); padding: 1px 6px; border-radius: 99px; }
+.gc-chip-n     { font-family: 'JetBrains Mono',monospace; font-size: .65rem; background: rgba(255,255,255,.1); padding: 1px 6px; border-radius: 99px; }
+
+/* búsqueda + contador */
+.gc-search-row {
+  display: flex; align-items: center; gap: 10px;
+  padding: 12px 18px 8px;
+  border-bottom: 1px solid rgba(255,255,255,.06);
+  background: rgba(8,14,26,.5);
+}
+.gc-search-wrap { position: relative; flex: 1; }
+.gc-search-ico  { position: absolute; left: 11px; top: 50%; transform: translateY(-50%); width: 15px; height: 15px; color: #4a607a; pointer-events: none; }
+.gc-search-inp  {
+  width: 100%; background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px; padding: 8px 34px 8px 34px;
+  font-size: .8rem; color: #e2e8f0; outline: none; font-family: 'JetBrains Mono',monospace;
+  transition: border-color .15s, box-shadow .15s;
+}
+.gc-search-inp::placeholder { color: #334155; }
+.gc-search-inp:focus { border-color: rgba(37,99,235,.5); box-shadow: 0 0 0 3px rgba(37,99,235,.12); }
+.gc-search-clr {
+  position: absolute; right: 8px; top: 50%; transform: translateY(-50%);
+  width: 20px; height: 20px; border-radius: 50%;
+  background: #334155; border: none;
+  display: none; align-items: center; justify-content: center;
+  cursor: pointer; color: #94a3b8;
+}
+.gc-search-clr svg { width: 10px; height: 10px; }
+.gc-counter { font-family: 'JetBrains Mono',monospace; font-size: .68rem; color: #4a607a; white-space: nowrap; flex-shrink: 0; }
+
+/* sin resultados */
+.gc-no-results {
+  display: none; align-items: center; justify-content: center; gap: 10px;
+  padding: 28px 16px; color: #4a607a; font-size: .82rem;
+}
+
+/* ─── DASHBOARD — chips carrera tabla viva ─────────── */
+.dv-chips-wrap {
+  background: rgba(13,20,36,.8);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 12px;
+  padding: 12px 14px;
+}
+.dv-chips-label {
+  display: flex; align-items: center; gap: 6px;
+  font-size: .65rem; color: #4a607a; font-weight: 700;
+  text-transform: uppercase; letter-spacing: .07em;
+  margin-bottom: 9px;
+}
+.dv-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+.dv-chip {
+  display: inline-flex; align-items: center; gap: 6px;
+  padding: 5px 11px; border-radius: 99px; cursor: pointer;
+  border: 1px solid rgba(255,255,255,.1); background: rgba(255,255,255,.04);
+  color: #7a8fa8; font-size: .72rem; font-weight: 600; font-family: inherit;
+  transition: all .15s; white-space: nowrap;
+}
+.dv-chip:hover { border-color: rgba(255,255,255,.18); color: #e2e8f0; }
+.dv-chip--act  { outline: 2px solid currentColor; box-shadow: 0 0 0 3px rgba(255,255,255,.04); }
+.dv-dot  { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.dv-pct  { font-family: 'JetBrains Mono',monospace; font-size: .67rem; background: rgba(0,0,0,.25); padding: 1px 6px; border-radius: 99px; }
+.dv-n    { font-family: 'JetBrains Mono',monospace; font-size: .65rem; background: rgba(255,255,255,.1); padding: 1px 6px; border-radius: 99px; }
+
+/* ─── DASHBOARD — sección chart carreras ───────────── */
+.dash-section-card {
+  background: rgba(13,20,36,.7);
+  border: 1px solid rgba(255,255,255,.07);
+  border-radius: 14px; overflow: hidden;
+}
+.dash-section-hd {
+  display: flex; align-items: center; justify-content: space-between;
+  flex-wrap: wrap; gap: 10px;
+  padding: 14px 20px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+  background: rgba(255,255,255,.02);
+}
+.dash-section-icon {
+  width: 26px; height: 26px; border-radius: 7px;
+  background: rgba(37,99,235,.12); border: 1px solid rgba(37,99,235,.25);
+  display: flex; align-items: center; justify-content: center;
+}
+.dash-section-title { font-size: .88rem; font-weight: 700; color: #e8eef8; }
+.dash-section-badge {
+  font-family: 'JetBrains Mono',monospace; font-size: .63rem;
+  background: rgba(255,255,255,.06); border: 1px solid rgba(255,255,255,.09);
+  padding: 2px 9px; border-radius: 99px; color: #4a607a;
+}
+.dash-section-filters {
+  display: flex; align-items: center; flex-wrap: wrap; gap: 8px;
+  padding: 12px 20px;
+  border-bottom: 1px solid rgba(255,255,255,.07);
+}
+
+/* botones vista barras/cards */
+.dv-view-btn {
+  display: flex; align-items: center; gap: 5px;
+  padding: 5px 12px; border-radius: 99px;
+  border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03);
+  color: #7a8fa8; font-size: .72rem; font-weight: 700; cursor: pointer;
+  font-family: inherit; transition: all .15s;
+}
+.dv-view-btn--act {
+  border-color: rgba(37,99,235,.45); background: rgba(37,99,235,.18); color: #60a5fa;
+}
+
+/* botones filtro chart */
+.dv-filter-btn {
+  display: flex; align-items: center; gap: 7px;
+  padding: 5px 13px; border-radius: 99px;
+  border: 1px solid rgba(255,255,255,.08); background: rgba(255,255,255,.03);
+  color: #7a8fa8; font-size: .75rem; font-weight: 700; cursor: pointer;
+  font-family: inherit; transition: all .15s; white-space: nowrap;
+}
+.dv-filter-btn--act { border-color: rgba(37,99,235,.45); background: rgba(37,99,235,.16); color: #60a5fa; }
+.dv-fn { font-family: 'JetBrains Mono',monospace; font-size: .67rem; background: rgba(255,255,255,.08); padding: 1px 7px; border-radius: 99px; }
+.dv-leyenda {
+  margin-left: auto; display: flex; align-items: center; gap: 12px;
+  font-family: 'JetBrains Mono',monospace; font-size: .66rem; color: #4a607a;
+}
+.dv-sq { width: 8px; height: 8px; border-radius: 2px; display: inline-block; margin-right: 3px; vertical-align: -1px; }
+
+/* ─── GRUPOS HISTÓRICOS (dashboard) ────────────────── */
+.dgh-card {
+  position: relative;
+  background: rgba(13,20,36,.75);
+  border: 1px solid rgba(255,255,255,.08);
+  border-radius: 14px; overflow: hidden;
+  transition: border-color .2s, box-shadow .2s;
+}
+.dgh-card:hover { border-color: rgba(255,255,255,.14); box-shadow: 0 4px 24px rgba(0,0,0,.4); }
+.dgh-accent { position: absolute; top: 0; left: 0; right: 0; height: 2px; }
+
+.dgh-header {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 16px 10px;
+}
+.dgh-header-info { flex: 1; min-width: 0; }
+.dgh-nombre { font-size: .88rem; font-weight: 700; color: #f1f5f9; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.dgh-meta   { display: flex; align-items: center; gap: 5px; font-size: .67rem; color: #4a607a; font-family: 'JetBrains Mono',monospace; margin-top: 3px; flex-wrap: wrap; }
+.dgh-sep    { color: #334155; }
+.dgh-pct    { font-family: 'JetBrains Mono',monospace; font-size: 1.4rem; font-weight: 800; flex-shrink: 0; }
+
+.dgh-toggle {
+  flex-shrink: 0; width: 30px; height: 30px;
+  background: rgba(255,255,255,.04); border: 1px solid rgba(255,255,255,.08);
+  border-radius: 8px; display: flex; align-items: center; justify-content: center;
+  color: #64748b; cursor: pointer; transition: background .15s;
+}
+.dgh-toggle:hover { background: rgba(255,255,255,.08); color: #e2e8f0; }
+.dgh-chev { transition: transform .25s ease; }
+
+.dgh-progress { display: flex; align-items: center; gap: 10px; padding: 6px 16px 10px; }
+.dgh-progress-track { flex:1; height:4px; background:rgba(255,255,255,.06); border-radius:99px; overflow:hidden; }
+.dgh-progress-fill  { height:100%; border-radius:99px; transition:width .5s ease; }
+.dgh-progress-lbl   { font-family:'JetBrains Mono',monospace; font-size:.68rem; font-weight:700; min-width:34px; text-align:right; }
+
+.dgh-stats {
+  display: flex; flex-wrap: wrap; gap: 6px;
+  padding: 0 16px 12px;
+}
+.dgh-stat {
+  font-size: .7rem; padding: 3px 10px; border-radius: 20px;
+  background: rgba(255,255,255,.04); color: #4a607a; font-family: 'JetBrains Mono',monospace;
+}
+.dgh-stat b { color: #94a3b8; font-weight: 700; }
+.dgh-stat--ok  { background: rgba(34,197,94,.08);  color: #4ade80; }
+.dgh-stat--ok  b { color: #4ade80; }
+.dgh-stat--bad { background: rgba(248,113,113,.08); color: #f87171; }
+.dgh-stat--bad b { color: #f87171; }
+
+/* mini barras histórico */
+.dgh-barras-wrap { padding: 0 16px 14px; border-bottom: 1px solid rgba(255,255,255,.06); }
+.dgh-section-lbl {
+  display: flex; align-items: center; gap: 6px;
+  font-size: .65rem; font-weight: 700; color: #4a607a;
+  text-transform: uppercase; letter-spacing: .07em; margin-bottom: 9px;
+}
+.dgh-barras { display: flex; flex-direction: column; gap: 6px; }
+.dgh-bar-row  { display: flex; align-items: center; gap: 8px; }
+.dgh-bar-name { flex:1; min-width:0; font-size:.69rem; color:#64748b; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; }
+.dgh-bar-track{ width:80px; height:4px; background:rgba(255,255,255,.06); border-radius:99px; overflow:hidden; flex-shrink:0; }
+.dgh-bar-fill { height:100%; border-radius:99px; transition:width .5s ease; }
+.dgh-bar-pct  { font-family:'JetBrains Mono',monospace; font-size:.67rem; font-weight:700; min-width:32px; text-align:right; flex-shrink:0; }
+.dgh-bar-frac { font-family:'JetBrains Mono',monospace; font-size:.62rem; color:#4a607a; min-width:34px; text-align:right; flex-shrink:0; }
+
+/* panel chips + tabla histórico */
+.dgh-panel { border-top: 1px solid rgba(255,255,255,.06); }
+.dgh-chips  { display:flex; flex-wrap:wrap; gap:6px; padding:4px 16px 12px; }
+.dgh-chip {
+  display:inline-flex; align-items:center; gap:6px;
+  padding:5px 11px; border-radius:99px; cursor:pointer;
+  border:1px solid rgba(255,255,255,.1); background:rgba(255,255,255,.04);
+  color:#7a8fa8; font-size:.71rem; font-weight:600; font-family:inherit;
+  transition:filter .15s, box-shadow .15s; white-space:nowrap;
+}
+.dgh-chip:hover { filter:brightness(1.1); }
+.dgh-chip--act  { outline:2px solid currentColor; box-shadow:0 0 0 3px rgba(255,255,255,.04); }
+.dgh-chip-pct { font-family:'JetBrains Mono',monospace; font-size:.65rem; background:rgba(0,0,0,.25); padding:1px 6px; border-radius:99px; }
+.dgh-chip-n   { font-family:'JetBrains Mono',monospace; font-size:.63rem; background:rgba(255,255,255,.1); padding:1px 6px; border-radius:99px; }
+.dgh-counter  { padding:4px 16px 6px; font-family:'JetBrains Mono',monospace; font-size:.68rem; color:#4a607a; }
+
+/* ─── RESPONSIVE ────────────────────────────────────── */
+@media (max-width: 640px) {
+  .gc-stats { grid-template-columns: repeat(2,1fr); }
+  .gc-bar-track { width: 60px; }
+  .dgh-bar-track{ width: 60px; }
+  .dv-leyenda   { display: none; }
+  .dash-section-filters { gap: 5px; }
+}

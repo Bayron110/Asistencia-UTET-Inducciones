@@ -24,52 +24,117 @@ const DB_GRUPOS = 'grupos';
 
 const $ = id => document.getElementById(id);
 
-const excelFileInput = $('excelFileInput');
-const openExcelModalBtn = $('openExcelModalBtn');
-const excelSelectedInfo = $('excelSelectedInfo');
-const excelModalBackdrop = $('excelModalBackdrop');
-const closeExcelModalBtn = $('closeExcelModalBtn');
-const cancelExcelBtn = $('cancelExcelBtn');
-const prepareExcelBtn = $('prepareExcelBtn');
-const excelFileName = $('excelFileName');
-const excelSheetName = $('excelSheetName');
-const excelRowCount = $('excelRowCount');
-const excelHeadersList = $('excelHeadersList');
-const mapCedulaSelect = $('mapCedulaSelect');
-const mapNombresSelect = $('mapNombresSelect');
-const mapCarreraSelect = $('mapCarreraSelect');
-const excelPreviewHead = $('excelPreviewHead');
-const excelPreviewBody = $('excelPreviewBody');
-
-const migrarBtn = $('migrarBtn');
-const grupoModalBackdrop = $('grupoModalBackdrop');
-const grupoNombreInput = $('grupoNombreInput');
-const confirmarGrupoBtn = $('confirmarGrupoBtn');
-const cancelarGrupoBtn = $('cancelarGrupoBtn');
-const closeGrupoModalBtn = $('closeGrupoModalBtn');
-const gruposListContainer = $('gruposListContainer');
-const gruposEmptyState = $('gruposEmptyState');
+const excelFileInput        = $('excelFileInput');
+const openExcelModalBtn     = $('openExcelModalBtn');
+const excelSelectedInfo     = $('excelSelectedInfo');
+const excelModalBackdrop    = $('excelModalBackdrop');
+const closeExcelModalBtn    = $('closeExcelModalBtn');
+const cancelExcelBtn        = $('cancelExcelBtn');
+const prepareExcelBtn       = $('prepareExcelBtn');
+const excelFileName         = $('excelFileName');
+const excelSheetName        = $('excelSheetName');
+const excelRowCount         = $('excelRowCount');
+const excelHeadersList      = $('excelHeadersList');
+const mapCedulaSelect       = $('mapCedulaSelect');
+const mapNombresSelect      = $('mapNombresSelect');
+const mapCarreraSelect      = $('mapCarreraSelect');
+const excelPreviewHead      = $('excelPreviewHead');
+const excelPreviewBody      = $('excelPreviewBody');
+const migrarBtn             = $('migrarBtn');
+const grupoModalBackdrop    = $('grupoModalBackdrop');
+const grupoNombreInput      = $('grupoNombreInput');
+const confirmarGrupoBtn     = $('confirmarGrupoBtn');
+const cancelarGrupoBtn      = $('cancelarGrupoBtn');
+const closeGrupoModalBtn    = $('closeGrupoModalBtn');
+const gruposListContainer   = $('gruposListContainer');
+const gruposEmptyState      = $('gruposEmptyState');
 
 let listenersGruposIniciados = false;
 let obtenerRegistrosActuales = () => ({});
 let gruposData = {};
 
-// Almacena el estado de búsqueda por grupo
-const gruposSearchState = {};
+const gruposSearchState  = {};
+const gruposCarreraState = {};
 
 let excelState = {
-  file: null,
-  fileName: '',
-  sheetName: '',
-  headers: [],
-  rows: [],
-  rowsFormatted: [],
-  mapping: {
-    cedula: '',
-    nombres: '',
-    carrera: ''
-  }
+  file: null, fileName: '', sheetName: '',
+  headers: [], rows: [], rowsFormatted: [],
+  mapping: { cedula: '', nombres: '', carrera: '' }
 };
+
+
+/* ══════════════════════════════════════════════════════════════
+   ESTILOS — se inyectan UNA SOLA VEZ en el <head>
+══════════════════════════════════════════════════════════════ */
+
+function injectGruposStyles() {
+  if (document.getElementById('grupos-dynamic-styles')) return;
+  const style = document.createElement('style');
+  style.id = 'grupos-dynamic-styles';
+  style.textContent = `
+    /* KPIs */
+    .grupo-card__kpis {
+      display: flex; align-items: center;
+      padding: 16px 24px 0;
+      border-top: 1px solid rgba(255,255,255,.06);
+      margin-top: 14px;
+    }
+    .gc-kpi { flex: 1; text-align: center; padding: 8px 4px; }
+    .gc-kpi__val {
+      font-size: 1.6rem; font-weight: 800; line-height: 1;
+      color: #e2e8f0; letter-spacing: -.02em;
+    }
+    .gc-kpi__val--pct { color: var(--kpi-color, #e2e8f0); }
+    .gc-kpi__lbl {
+      font-size: .67rem; font-weight: 600; letter-spacing: .08em;
+      text-transform: uppercase; color: #475569; margin-top: 4px;
+    }
+    .gc-kpi--ok  .gc-kpi__val { color: #4ade80; }
+    .gc-kpi--bad .gc-kpi__val { color: #f87171; }
+    .gc-kpi-divider { width: 1px; height: 36px; background: rgba(255,255,255,.07); flex-shrink: 0; }
+    /* Progress bar */
+    .grupo-card__progress-row { padding: 12px 24px 0; }
+    .grupo-card__progress-track {
+      height: 4px; background: rgba(255,255,255,.07); border-radius: 99px; overflow: hidden;
+    }
+    .grupo-card__progress-fill { height: 100%; border-radius: 99px; transition: width .6s cubic-bezier(.4,0,.2,1); }
+    /* Meta icons */
+    .grupo-card__meta svg { width: 11px; height: 11px; vertical-align: -1px; margin-right: 3px; }
+    /* Panel carreras */
+    .gc-panel {
+      background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08);
+      border-radius: 14px; padding: 20px 24px 16px; margin: 0 0 20px;
+    }
+    .gc-panel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .gc-panel-title {
+      display: flex; align-items: center; gap: 8px;
+      font-size: .8rem; font-weight: 700; letter-spacing: .06em;
+      text-transform: uppercase; color: #94a3b8;
+    }
+    .gc-panel-title svg { width: 14px; height: 14px; }
+    .gc-panel-count {
+      margin-left: auto; font-size: .72rem; font-weight: 600; color: #475569;
+      background: rgba(255,255,255,.05); padding: 2px 10px;
+      border-radius: 99px; border: 1px solid rgba(255,255,255,.08);
+    }
+    /* Chips */
+    .gc-chips-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
+    .gc-carrera-chip {
+      display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px;
+      border-radius: 8px; border: 1px solid rgba(255,255,255,.1);
+      background: rgba(255,255,255,.04); color: #94a3b8;
+      font-size: .72rem; font-weight: 600; font-family: inherit;
+      cursor: pointer; transition: all .15s; white-space: nowrap; max-width: 220px;
+    }
+    .gc-carrera-chip:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); color: #e2e8f0; }
+    .gc-carrera-chip.gc-chip-active { background: rgba(37,99,235,.18); border-color: rgba(59,130,246,.45); color: #60a5fa; }
+    .gc-chip-todas { color: #60a5fa; }
+    .gc-chip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
+    .gc-chip-name { overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
+    .gc-chip-pct { font-size: .68rem; font-family: 'JetBrains Mono','Fira Code',monospace; font-weight: 700; flex-shrink: 0; }
+  `;
+  document.head.appendChild(style);
+}
 
 /* ══════════════════════════════════════════════════════════════
    UTILIDADES
@@ -77,40 +142,29 @@ let excelState = {
 
 function escHtml(str) {
   return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
+    .replace(/&/g, '&amp;').replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
 function toast(msg, type = 'info') {
   const toastContainer = $('toastContainer');
   if (!toastContainer) return;
-
   const icons = {
     success: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"/></svg>`,
-    warn: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
-    error: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
-    info: `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
+    warn:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`,
+    error:   `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>`,
+    info:    `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>`
   };
-
   const t = document.createElement('div');
   t.className = `toast toast--${type}`;
   t.innerHTML = (icons[type] || '') + `<span>${escHtml(msg)}</span>`;
   toastContainer.appendChild(t);
-
-  setTimeout(() => {
-    t.style.transition = 'opacity .3s';
-    t.style.opacity = '0';
-    setTimeout(() => t.remove(), 300);
-  }, 3500);
+  setTimeout(() => { t.style.transition = 'opacity .3s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3500);
 }
 
 function rawToCedula(v) {
   if (v === null || v === undefined || v === '') return '';
-  if (typeof v === 'number') {
-    return String(Math.round(v)).padStart(10, '0');
-  }
+  if (typeof v === 'number') return String(Math.round(v)).padStart(10, '0');
   const digits = String(v).replace(/\D/g, '').trim();
   if (!digits) return '';
   return digits.padStart(10, '0');
@@ -122,11 +176,7 @@ function rawToTexto(v) {
 }
 
 function normalizeHeader(v) {
-  return String(v || '')
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .trim()
-    .toLowerCase();
+  return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 }
 
 function suggestHeader(headers, candidates) {
@@ -145,73 +195,57 @@ function configurarExcelGrupos(opciones = {}) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   EXCEL — sin cambios
+   EXCEL
 ══════════════════════════════════════════════════════════════ */
 
 function handleExcelFileChange() {
   const file = excelFileInput?.files?.[0];
-  if (!file) {
-    if (excelSelectedInfo) excelSelectedInfo.textContent = 'Ningún archivo seleccionado.';
-    return;
-  }
+  if (!file) { if (excelSelectedInfo) excelSelectedInfo.textContent = 'Ningún archivo seleccionado.'; return; }
   if (!/\.(xls|xlsx)$/i.test(file.name)) {
     excelFileInput.value = '';
     if (excelSelectedInfo) excelSelectedInfo.textContent = 'Archivo inválido.';
-    toast('Solo se permiten archivos .xls o .xlsx', 'warn');
-    return;
+    toast('Solo se permiten archivos .xls o .xlsx', 'warn'); return;
   }
-  if (excelSelectedInfo) {
-    excelSelectedInfo.textContent = `Archivo seleccionado: ${file.name}`;
-  }
-  excelState.file = file;
-  excelState.fileName = file.name;
+  if (excelSelectedInfo) excelSelectedInfo.textContent = `Archivo seleccionado: ${file.name}`;
+  excelState.file = file; excelState.fileName = file.name;
 }
 
 function openExcelReview() {
   const file = excelFileInput?.files?.[0];
   if (!file) { toast('Selecciona primero un archivo Excel.', 'warn'); return; }
   if (typeof XLSX === 'undefined') { toast('Falta cargar la librería XLSX en el HTML.', 'error'); return; }
-
   const reader = new FileReader();
   reader.onload = e => {
     try {
       const buffer = e.target.result;
-      const wbRaw = XLSX.read(new Uint8Array(buffer), { type: 'array', raw: true, codepage: 65001 });
-      const wbFmt = XLSX.read(new Uint8Array(buffer), { type: 'array', raw: false, codepage: 65001 });
+      const wbRaw  = XLSX.read(new Uint8Array(buffer), { type: 'array', raw: true,  codepage: 65001 });
+      const wbFmt  = XLSX.read(new Uint8Array(buffer), { type: 'array', raw: false, codepage: 65001 });
       if (!wbRaw.SheetNames.length) { toast('El archivo no contiene hojas válidas.', 'warn'); return; }
       const sheetName = wbRaw.SheetNames[0];
-      const wsRaw = wbRaw.Sheets[sheetName];
-      const wsFmt = wbFmt.Sheets[sheetName];
-      const rowsRaw = XLSX.utils.sheet_to_json(wsRaw, { defval: '', raw: true });
-      const rowsFmt = XLSX.utils.sheet_to_json(wsFmt, { defval: '', raw: false });
+      const rowsRaw   = XLSX.utils.sheet_to_json(wbRaw.Sheets[sheetName], { defval: '', raw: true  });
+      const rowsFmt   = XLSX.utils.sheet_to_json(wbFmt.Sheets[sheetName], { defval: '', raw: false });
       if (!rowsRaw.length) { toast('La hoja está vacía.', 'warn'); return; }
       const headers = Object.keys(rowsRaw[0] || {});
       excelState = {
         file, fileName: file.name, sheetName, headers,
         rows: rowsRaw, rowsFormatted: rowsFmt,
         mapping: {
-          cedula: suggestHeader(headers, ['cedula', 'cédula', 'dni', 'identificacion', 'identificación']),
-          nombres: suggestHeader(headers, ['nombres', 'nombre', 'apellidos', 'estudiante', 'alumno']),
-          carrera: suggestHeader(headers, ['carrera', 'programa', 'especialidad', 'curso'])
+          cedula:  suggestHeader(headers, ['cedula','cédula','dni','identificacion','identificación']),
+          nombres: suggestHeader(headers, ['nombres','nombre','apellidos','estudiante','alumno']),
+          carrera: suggestHeader(headers, ['carrera','programa','especialidad','curso'])
         }
       };
-      fillExcelModal();
-      showExcelModal();
-    } catch (error) {
-      console.error(error);
-      toast('No se pudo leer el archivo Excel.', 'error');
-    }
+      fillExcelModal(); showExcelModal();
+    } catch (error) { console.error(error); toast('No se pudo leer el archivo Excel.', 'error'); }
   };
   reader.readAsArrayBuffer(file);
 }
 
 function fillExcelModal() {
-  if (excelFileName) excelFileName.textContent = excelState.fileName || '—';
+  if (excelFileName)  excelFileName.textContent  = excelState.fileName  || '—';
   if (excelSheetName) excelSheetName.textContent = excelState.sheetName || '—';
-  if (excelRowCount) excelRowCount.textContent = String(excelState.rows.length || 0);
-  renderHeaders();
-  renderMappingSelects();
-  renderPreviewTable();
+  if (excelRowCount)  excelRowCount.textContent  = String(excelState.rows.length || 0);
+  renderHeaders(); renderMappingSelects(); renderPreviewTable();
 }
 
 function renderHeaders() {
@@ -238,7 +272,7 @@ function renderMappingSelects() {
       sel.appendChild(opt);
     });
   });
-  if (excelState.mapping.cedula) mapCedulaSelect.value = excelState.mapping.cedula;
+  if (excelState.mapping.cedula)  mapCedulaSelect.value  = excelState.mapping.cedula;
   if (excelState.mapping.nombres) mapNombresSelect.value = excelState.mapping.nombres;
   if (excelState.mapping.carrera) mapCarreraSelect.value = excelState.mapping.carrera;
 }
@@ -246,37 +280,24 @@ function renderMappingSelects() {
 function renderPreviewTable() {
   if (!excelPreviewHead || !excelPreviewBody) return;
   const previewRows = excelState.rowsFormatted.slice(0, 5);
-  const headers = excelState.headers;
+  const headers     = excelState.headers;
   excelPreviewHead.innerHTML = '';
   excelPreviewBody.innerHTML = '';
   const headRow = document.createElement('tr');
-  headers.forEach(h => {
-    const th = document.createElement('th');
-    th.textContent = h;
-    headRow.appendChild(th);
-  });
+  headers.forEach(h => { const th = document.createElement('th'); th.textContent = h; headRow.appendChild(th); });
   excelPreviewHead.appendChild(headRow);
   previewRows.forEach(row => {
     const tr = document.createElement('tr');
-    headers.forEach(h => {
-      const td = document.createElement('td');
-      td.textContent = row[h] ?? '';
-      tr.appendChild(td);
-    });
+    headers.forEach(h => { const td = document.createElement('td'); td.textContent = row[h] ?? ''; tr.appendChild(td); });
     excelPreviewBody.appendChild(tr);
   });
 }
 
-function showExcelModal() {
-  if (excelModalBackdrop) excelModalBackdrop.style.display = 'flex';
-}
-
-function closeExcelModal() {
-  if (excelModalBackdrop) excelModalBackdrop.style.display = 'none';
-}
+function showExcelModal()  { if (excelModalBackdrop) excelModalBackdrop.style.display = 'flex'; }
+function closeExcelModal() { if (excelModalBackdrop) excelModalBackdrop.style.display = 'none'; }
 
 async function prepararCargaExcel() {
-  const cedulaCol = mapCedulaSelect?.value || '';
+  const cedulaCol  = mapCedulaSelect?.value  || '';
   const nombresCol = mapNombresSelect?.value || '';
   const carreraCol = mapCarreraSelect?.value || '';
   if (!cedulaCol) { toast('Debes seleccionar al menos la columna de cédula.', 'warn'); return; }
@@ -286,26 +307,21 @@ async function prepararCargaExcel() {
     const cedula = rawToCedula(row[cedulaCol]);
     if (!cedula) continue;
     const registro = { cedula, telegram: '', asistencia: false };
-    if (nombresCol) { const nombres = rawToTexto(row[nombresCol]); if (nombres) registro.nombres = nombres; }
-    if (carreraCol) { const carrera = rawToTexto(row[carreraCol]); if (carrera) registro.carrera = carrera; }
+    if (nombresCol) { const n = rawToTexto(row[nombresCol]); if (n) registro.nombres = n; }
+    if (carreraCol) { const c = rawToTexto(row[carreraCol]); if (c) registro.carrera = c; }
     registrosLimpios[cedula] = registro;
   }
-
   const totalValidos = Object.keys(registrosLimpios).length;
   if (!totalValidos) { toast('No se encontraron filas válidas para importar.', 'warn'); return; }
-
   try {
     await adminSet(adminRef(adminDb, DB_ADMIN_ESTUDIANTES), registrosLimpios);
     toast(`Se importaron ${totalValidos} registros correctamente.`, 'success');
     closeExcelModal();
-  } catch (error) {
-    console.error(error);
-    toast('No se pudo guardar la información en la base admin.', 'error');
-  }
+  } catch (error) { console.error(error); toast('No se pudo guardar la información en la base admin.', 'error'); }
 }
 
 /* ══════════════════════════════════════════════════════════════
-   GRUPOS — MIGRACIÓN (sin cambios)
+   GRUPOS — MIGRACIÓN
 ══════════════════════════════════════════════════════════════ */
 
 function openGrupoModal() {
@@ -316,115 +332,107 @@ function openGrupoModal() {
   setTimeout(() => grupoNombreInput?.focus(), 100);
 }
 
-function closeGrupoModal() {
-  if (grupoModalBackdrop) grupoModalBackdrop.style.display = 'none';
-}
+function closeGrupoModal() { if (grupoModalBackdrop) grupoModalBackdrop.style.display = 'none'; }
 
 async function confirmarMigracionGrupo() {
-  const nombre = grupoNombreInput?.value?.trim();
+  const nombre    = grupoNombreInput?.value?.trim();
   const registros = obtenerRegistrosActuales();
-  if (!nombre) { toast('Ingresa un nombre para el grupo.', 'warn'); grupoNombreInput?.focus(); return; }
-  if (!Object.keys(registros).length) { toast('No hay registros para migrar.', 'warn'); return; }
+  if (!nombre)                            { toast('Ingresa un nombre para el grupo.', 'warn'); grupoNombreInput?.focus(); return; }
+  if (!Object.keys(registros).length)     { toast('No hay registros para migrar.', 'warn'); return; }
 
-  if (confirmarGrupoBtn) {
-    confirmarGrupoBtn.disabled = true;
-    confirmarGrupoBtn.textContent = 'Migrando…';
-  }
+  if (confirmarGrupoBtn) { confirmarGrupoBtn.disabled = true; confirmarGrupoBtn.textContent = 'Migrando…'; }
 
   try {
     const grupoKey = nombre
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-      .replace(/\s+/g, '_')
-      .replace(/[^a-zA-Z0-9_]/g, '')
-      .toLowerCase() + '_' + Date.now();
+      .replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '').toLowerCase() + '_' + Date.now();
 
     const estudiantes = {};
     for (const [cedula, d] of Object.entries(registros)) {
-      estudiantes[cedula] = {
-        cedula,
-        nombres: d.nombre || d.nombres || '',
-        carrera: d.carrera || '',
-        telegram: d.telegram || '',
-        asistencia: d.asistencia === true
-      };
+      estudiantes[cedula] = { cedula, nombres: d.nombre || d.nombres || '', carrera: d.carrera || '', telegram: d.telegram || '', asistencia: d.asistencia === true };
     }
 
-    const grupoPayload = {
-      nombre,
-      creadoEn: Date.now(),
-      totalEstudiantes: Object.keys(estudiantes).length,
-      estudiantes
-    };
-
+    const grupoPayload = { nombre, creadoEn: Date.now(), totalEstudiantes: Object.keys(estudiantes).length, estudiantes };
     await gruposSet(gruposRef(gruposDb, `${DB_GRUPOS}/${grupoKey}`), grupoPayload);
     await userRemove(userRef(userDb, DB_ASIST));
     await adminRemove(adminRef(adminDb, DB_ADMIN_ESTUDIANTES));
 
     gruposData[grupoKey] = grupoPayload;
     renderGrupos(gruposData);
-
     toast(`Grupo "${nombre}" creado con ${Object.keys(estudiantes).length} estudiantes.`, 'success');
     closeGrupoModal();
 
     const gruposNav = document.querySelector('[data-tab="grupos"]');
     if (gruposNav) gruposNav.click();
   } catch (err) {
-    console.error(err);
-    toast('Error al migrar. Revisa la consola.', 'error');
+    console.error(err); toast('Error al migrar. Revisa la consola.', 'error');
   } finally {
     if (confirmarGrupoBtn) {
       confirmarGrupoBtn.disabled = false;
-      confirmarGrupoBtn.innerHTML = `
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-          stroke-linecap="round" stroke-linejoin="round">
-          <path d="M5 12h14M12 5l7 7-7 7" />
-        </svg>
-        Crear grupo
-      `;
+      confirmarGrupoBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>Crear grupo`;
     }
   }
 }
 
 /* ══════════════════════════════════════════════════════════════
-   GRUPOS — RENDER MEJORADO
+   CARRERAS — helpers
 ══════════════════════════════════════════════════════════════ */
 
-/**
- * Filtra y re-renderiza la tabla de un grupo según la búsqueda actual.
- * @param {string} key - clave del grupo en Firebase
- * @param {object} estudiantes - objeto con los estudiantes del grupo
- */
-function aplicarBusquedaGrupo(key, estudiantes) {
-  const tableEl = document.getElementById(`grupo-table-${key}`);
-  const query = (gruposSearchState[key] || '').toLowerCase().trim();
+function calcCarrerasGrupo(estudiantes) {
+  const map = {};
+  Object.values(estudiantes).forEach(e => {
+    const c = (e.carrera || 'Sin carrera').trim();
+    if (!map[c]) map[c] = { total: 0, presentes: 0 };
+    map[c].total++;
+    if (e.asistencia === true) map[c].presentes++;
+  });
+  return map;
+}
 
-  if (!tableEl) return;
+function colorPct(pct) {
+  if (pct >= 80) return { text: '#4ade80', bg: 'rgba(34,197,94,.15)', border: 'rgba(34,197,94,.35)' };
+  if (pct >= 60) return { text: '#fbbf24', bg: 'rgba(245,158,11,.12)', border: 'rgba(245,158,11,.32)' };
+  if (pct >= 30) return { text: '#fb923c', bg: 'rgba(251,146,60,.12)', border: 'rgba(251,146,60,.32)' };
+  return               { text: '#f87171', bg: 'rgba(248,113,113,.12)', border: 'rgba(248,113,113,.32)' };
+}
 
-  const entries = Object.entries(estudiantes);
+/* ══════════════════════════════════════════════════════════════
+   TABLA INTERNA DEL GRUPO — filtrada
+══════════════════════════════════════════════════════════════ */
 
-  // Filtrar por cédula o nombre
-  const filtradas = query
-    ? entries.filter(([ced, d]) =>
-        ced.includes(query) ||
-        (d.nombres || '').toLowerCase().includes(query) ||
-        (d.carrera || '').toLowerCase().includes(query)
-      )
-    : entries;
+function aplicarFiltrosGrupo(key, estudiantes) {
+  const tableContainer = document.getElementById(`grupo-table-${key}`);
+  if (!tableContainer) return;
 
-  const tbody = tableEl.querySelector('tbody');
-  const noResults = tableEl.querySelector('.grupo-no-results');
+  const query   = (gruposSearchState[key]  || '').toLowerCase().trim();
+  const carrera = (gruposCarreraState[key] || 'todas');
 
-  if (!tbody) return;
+  let entries = Object.entries(estudiantes);
 
-  if (!filtradas.length) {
-    tbody.innerHTML = '';
-    if (noResults) noResults.style.display = 'flex';
-    return;
+  if (carrera !== 'todas') {
+    entries = entries.filter(([, d]) => (d.carrera || 'Sin carrera').trim() === carrera);
   }
 
-  if (noResults) noResults.style.display = 'none';
+  if (query) {
+    entries = entries.filter(([ced, d]) =>
+      ced.includes(query) ||
+      (d.nombres || '').toLowerCase().includes(query) ||
+      (d.carrera  || '').toLowerCase().includes(query)
+    );
+  }
 
-  tbody.innerHTML = filtradas.map(([ced, d], i) => `
+  const tbody    = tableContainer.querySelector('tbody');
+  const noResult = tableContainer.querySelector('.grupo-no-results');
+  if (!tbody) return;
+
+  if (!entries.length) {
+    tbody.innerHTML = '';
+    if (noResult) noResult.style.display = 'flex';
+    return;
+  }
+  if (noResult) noResult.style.display = 'none';
+
+  tbody.innerHTML = entries.map(([ced, d], i) => `
     <tr>
       <td>${i + 1}</td>
       <td><span class="badge-cedula">${escHtml(ced)}</span></td>
@@ -433,21 +441,84 @@ function aplicarBusquedaGrupo(key, estudiantes) {
       <td class="badge-telegram">${escHtml(d.telegram || '—')}</td>
       <td>
         <span class="${d.asistencia ? 'tag-asistencia-ok' : 'tag-asistencia-no'}">
-          ${d.asistencia ? '✔ Presente' : '✖ Ausente'}
+          ${d.asistencia ? 'Presente' : 'Ausente'}
         </span>
       </td>
     </tr>
   `).join('');
 }
 
-/**
- * Construye el contenedor expandible de un grupo (búsqueda + tabla).
- */
-function buildGrupoTableContainer(key, estudiantes) {
+/* ══════════════════════════════════════════════════════════════
+   PANEL DE CARRERAS — REDISEÑADO
+   Layout: tabla izquierda (nombre + barra + %) | stats pequeñas
+══════════════════════════════════════════════════════════════ */
+
+function buildCarrerasPanel(key, estudiantes) {
+  const map = calcCarrerasGrupo(estudiantes);
+  const carreras = Object.entries(map).sort((a, b) => {
+    const pA = a[1].total > 0 ? (a[1].presentes / a[1].total) : 0;
+    const pB = b[1].total > 0 ? (b[1].presentes / b[1].total) : 0;
+    return pB - pA;
+  });
+
+  if (!carreras.length) return '';
+
+  /* ─── chips de filtro rápido ─── */
+  const chipsHtml = carreras.map(([nombre, d]) => {
+    const pct = d.total > 0 ? Math.round((d.presentes / d.total) * 100) : 0;
+    const col = colorPct(pct);
+    return `
+      <button
+        class="gc-carrera-chip"
+        data-key="${escHtml(key)}"
+        data-carrera="${escHtml(nombre)}"
+        title="${escHtml(nombre)}: ${d.presentes}/${d.total} presentes"
+      >
+        <span class="gc-chip-dot" style="background:${col.text};"></span>
+        <span class="gc-chip-name">${escHtml(nombre)}</span>
+        <span class="gc-chip-pct" style="color:${col.text};">${pct}%</span>
+      </button>`;
+  }).join('');
+
+  /* ─── filas de la tabla de barras ─── */
+
+  return `
+    <div class="gc-panel">
+      <!-- Encabezado del panel -->
+      <div class="gc-panel-header">
+        <div class="gc-panel-title">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+            stroke-linecap="round" stroke-linejoin="round">
+            <rect x="3" y="3" width="18" height="18" rx="2"/>
+            <path d="M3 9h18M9 21V9"/>
+          </svg>
+          Desglose por carrera
+        </div>
+        <span class="gc-panel-count">${carreras.length} ${carreras.length === 1 ? 'carrera' : 'carreras'}</span>
+      </div>
+
+      <!-- Chips de filtro (scroll horizontal en móvil) -->
+      <div class="gc-chips-wrap">
+        <button
+          class="gc-carrera-chip gc-chip-todas gc-chip-active"
+          data-key="${escHtml(key)}"
+          data-carrera="todas"
+        >
+          <span class="gc-chip-name">Todas</span>
+        </button>
+        ${chipsHtml}
+      </div>
+    </div>
+  `;
+}
+
+/* ══════════════════════════════════════════════════════════════
+   CONTENIDO DEL PANEL EXPANDIBLE (búsqueda + tabla)
+══════════════════════════════════════════════════════════════ */
+
+function buildGrupoBodyContent(key, estudiantes) {
   const entries = Object.entries(estudiantes);
-  if (!entries.length) {
-    return '<p style="padding:12px;color:#94a3b8">Sin estudiantes.</p>';
-  }
+  if (!entries.length) return '<p style="padding:20px;color:#94a3b8;">Sin estudiantes.</p>';
 
   const filas = entries.map(([ced, d], i) => `
     <tr>
@@ -458,20 +529,21 @@ function buildGrupoTableContainer(key, estudiantes) {
       <td class="badge-telegram">${escHtml(d.telegram || '—')}</td>
       <td>
         <span class="${d.asistencia ? 'tag-asistencia-ok' : 'tag-asistencia-no'}">
-          ${d.asistencia ? '✔ Presente' : '✖ Ausente'}
+          ${d.asistencia ? 'Presente' : 'Ausente'}
         </span>
       </td>
     </tr>
   `).join('');
 
   return `
-    <!-- Barra de búsqueda del grupo -->
+    ${buildCarrerasPanel(key, estudiantes)}
+
+    <!-- Barra búsqueda -->
     <div class="grupo-search-bar">
       <div class="grupo-search-wrap">
         <svg class="grupo-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
           stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-          <circle cx="11" cy="11" r="8"/>
-          <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+          <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
         </svg>
         <input
           type="text"
@@ -480,21 +552,19 @@ function buildGrupoTableContainer(key, estudiantes) {
           placeholder="Buscar por cédula, nombre o carrera…"
           autocomplete="off"
         >
-        <button class="grupo-search-clear" data-grupo-key="${escHtml(key)}" title="Limpiar búsqueda" style="display:none">
+        <button class="grupo-search-clear" data-grupo-key="${escHtml(key)}" title="Limpiar" style="display:none">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
             stroke-linecap="round" stroke-linejoin="round">
-            <line x1="18" y1="6" x2="6" y2="18"/>
-            <line x1="6" y1="6" x2="18" y2="18"/>
+            <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
           </svg>
         </button>
       </div>
     </div>
 
-    <!-- Mensaje sin resultados -->
+    <!-- Sin resultados -->
     <div class="grupo-no-results" style="display:none">
       <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
-        <circle cx="11" cy="11" r="8"/>
-        <line x1="21" y1="21" x2="16.65" y2="16.65"/>
+        <circle cx="11" cy="11" r="8"/><line x1="21" y1="21" x2="16.65" y2="16.65"/>
       </svg>
       <span>Sin resultados para la búsqueda</span>
     </div>
@@ -503,14 +573,7 @@ function buildGrupoTableContainer(key, estudiantes) {
     <div class="table-scroll" style="margin-top:0">
       <table class="data-table">
         <thead>
-          <tr>
-            <th>#</th>
-            <th>Cédula</th>
-            <th>Nombre</th>
-            <th>Carrera</th>
-            <th>Telegram</th>
-            <th>Asistencia</th>
-          </tr>
+          <tr><th>#</th><th>Cédula</th><th>Nombre</th><th>Carrera</th><th>Telegram</th><th>Asistencia</th></tr>
         </thead>
         <tbody>${filas}</tbody>
       </table>
@@ -518,52 +581,45 @@ function buildGrupoTableContainer(key, estudiantes) {
   `;
 }
 
-/**
- * Renderiza todos los grupos en el contenedor principal.
- */
+/* ══════════════════════════════════════════════════════════════
+   RENDER PRINCIPAL DE GRUPOS
+══════════════════════════════════════════════════════════════ */
+
 function renderGrupos(data) {
   if (!gruposListContainer) return;
 
   const keys = Object.keys(data);
-
   if (!keys.length) {
     gruposListContainer.innerHTML = '';
     if (gruposEmptyState) gruposEmptyState.style.display = 'flex';
     return;
   }
-
   if (gruposEmptyState) gruposEmptyState.style.display = 'none';
   gruposListContainer.innerHTML = '';
 
   keys
     .sort((a, b) => (data[b].creadoEn || 0) - (data[a].creadoEn || 0))
     .forEach(key => {
-      const grupo = data[key];
+      const grupo       = data[key];
       const estudiantes = grupo.estudiantes || {};
-      const total = Object.keys(estudiantes).length;
-      const asistieron = Object.values(estudiantes).filter(e => e.asistencia).length;
-      const ausentes = total - asistieron;
-      const pct = total > 0 ? Math.round((asistieron / total) * 100) : 0;
+      const total       = Object.keys(estudiantes).length;
+      const asistieron  = Object.values(estudiantes).filter(e => e.asistencia).length;
+      const ausentes    = total - asistieron;
+      const pct         = total > 0 ? Math.round((asistieron / total) * 100) : 0;
 
       const fecha = new Date(grupo.creadoEn || 0).toLocaleDateString('es-EC', {
-        day: '2-digit',
-        month: 'long',
-        year: 'numeric',
-        hour: '2-digit',
-        minute: '2-digit'
+        day: '2-digit', month: 'long', year: 'numeric',
+        hour: '2-digit', minute: '2-digit'
       });
 
-      // Color de la barra según porcentaje
-      const barColor = pct >= 80
-        ? 'var(--color-ok, #22c55e)'
-        : pct >= 50
-          ? 'var(--color-warn, #f59e0b)'
-          : 'var(--color-bad, #ef4444)';
+      const col      = colorPct(pct);
+      const carrMap  = calcCarrerasGrupo(estudiantes);
+      const nCarreras = Object.keys(carrMap).length;
 
       const card = document.createElement('div');
       card.className = 'grupo-card grupo-card--v2';
       card.innerHTML = `
-        <!-- Cabecera del grupo -->
+        <!-- ╔══ CABECERA ══╗ -->
         <div class="grupo-card__header-v2">
           <div class="grupo-card__icon-wrap">
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8"
@@ -577,11 +633,16 @@ function renderGrupos(data) {
             <div class="grupo-card__name">${escHtml(grupo.nombre || key)}</div>
             <div class="grupo-card__meta">
               <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-                stroke-linecap="round" stroke-linejoin="round" style="width:13px;height:13px;vertical-align:-2px;margin-right:4px">
-                <circle cx="12" cy="12" r="10"/>
-                <polyline points="12 6 12 12 16 14"/>
+                stroke-linecap="round" stroke-linejoin="round">
+                <circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/>
               </svg>
               ${fecha}
+              &nbsp;·&nbsp;
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+                stroke-linecap="round" stroke-linejoin="round">
+                <rect x="3" y="3" width="18" height="18" rx="2"/><path d="M3 9h18M9 21V9"/>
+              </svg>
+              ${nCarreras} ${nCarreras === 1 ? 'carrera' : 'carreras'}
             </div>
           </div>
           <button class="grupo-card__toggle-v2" data-key="${escHtml(key)}" aria-expanded="false">
@@ -592,53 +653,60 @@ function renderGrupos(data) {
           </button>
         </div>
 
-        <!-- Stats rápidas -->
-        <div class="grupo-card__stats-v2">
-          <div class="grupo-stat">
-            <div class="grupo-stat__num">${total}</div>
-            <div class="grupo-stat__label">Total</div>
+        <!-- ╔══ STATS + BARRA ══╗ -->
+        <div class="grupo-card__kpis">
+          <!-- Stat: Total -->
+          <div class="gc-kpi">
+            <div class="gc-kpi__val">${total}</div>
+            <div class="gc-kpi__lbl">Total</div>
           </div>
-          <div class="grupo-stat grupo-stat--ok">
-            <div class="grupo-stat__num">${asistieron}</div>
-            <div class="grupo-stat__label">Asistieron</div>
+          <!-- Divider -->
+          <div class="gc-kpi-divider"></div>
+          <!-- Stat: Asistieron -->
+          <div class="gc-kpi gc-kpi--ok">
+            <div class="gc-kpi__val">${asistieron}</div>
+            <div class="gc-kpi__lbl">Asistieron</div>
           </div>
-          <div class="grupo-stat grupo-stat--bad">
-            <div class="grupo-stat__num">${ausentes}</div>
-            <div class="grupo-stat__label">Ausentes</div>
+          <!-- Divider -->
+          <div class="gc-kpi-divider"></div>
+          <!-- Stat: Ausentes -->
+          <div class="gc-kpi gc-kpi--bad">
+            <div class="gc-kpi__val">${ausentes}</div>
+            <div class="gc-kpi__lbl">Ausentes</div>
           </div>
-          <div class="grupo-stat grupo-stat--pct">
-            <div class="grupo-stat__num">${pct}%</div>
-            <div class="grupo-stat__label">Asistencia</div>
+          <!-- Divider -->
+          <div class="gc-kpi-divider"></div>
+          <!-- Stat: Porcentaje (prominente) -->
+          <div class="gc-kpi gc-kpi--pct" style="--kpi-color:${col.text};">
+            <div class="gc-kpi__val gc-kpi__val--pct">${pct}%</div>
+            <div class="gc-kpi__lbl">Asistencia</div>
           </div>
         </div>
 
-        <!-- Barra de progreso -->
-        <div class="grupo-card__progress-wrap">
-          <div class="grupo-card__progress-bar">
+        <!-- Barra de progreso slim -->
+        <div class="grupo-card__progress-row">
+          <div class="grupo-card__progress-track">
             <div class="grupo-card__progress-fill"
-              style="width:${pct}%; background:${barColor};"
-              title="${pct}% de asistencia">
+              style="width:${pct}%;background:${col.text};box-shadow:0 0 10px ${col.text}55;">
             </div>
           </div>
-          <span class="grupo-card__progress-label">${pct}%</span>
         </div>
 
-        <!-- Panel expandible (lista + búsqueda) -->
+        <!-- ╔══ PANEL EXPANDIBLE ══╗ -->
         <div class="grupo-card__body" id="grupo-table-${escHtml(key)}" style="display:none">
-          ${buildGrupoTableContainer(key, estudiantes)}
+          ${buildGrupoBodyContent(key, estudiantes)}
         </div>
       `;
 
       gruposListContainer.appendChild(card);
     });
 
-  // Vincular toggle de cada card
+  /* ── Toggle expandir ── */
   gruposListContainer.querySelectorAll('.grupo-card__toggle-v2').forEach(btn => {
     btn.addEventListener('click', () => {
-      const key = btn.dataset.key;
+      const key  = btn.dataset.key;
       const body = document.getElementById(`grupo-table-${key}`);
       if (!body) return;
-
       const isOpen = body.style.display !== 'none';
       body.style.display = isOpen ? 'none' : 'block';
       btn.setAttribute('aria-expanded', String(!isOpen));
@@ -646,42 +714,58 @@ function renderGrupos(data) {
     });
   });
 
-  // Vincular búsqueda en cada grupo
+  /* ── Búsqueda por texto ── */
   gruposListContainer.querySelectorAll('.grupo-search-input').forEach(input => {
-    const key = input.dataset.grupoKey;
+    const key      = input.dataset.grupoKey;
     const clearBtn = gruposListContainer.querySelector(`.grupo-search-clear[data-grupo-key="${key}"]`);
 
     input.addEventListener('input', () => {
-      const val = input.value;
-      gruposSearchState[key] = val;
-
-      // Mostrar/ocultar botón limpiar
-      if (clearBtn) clearBtn.style.display = val ? 'flex' : 'none';
-
-      aplicarBusquedaGrupo(key, gruposData[key]?.estudiantes || {});
+      gruposSearchState[key] = input.value;
+      if (clearBtn) clearBtn.style.display = input.value ? 'flex' : 'none';
+      aplicarFiltrosGrupo(key, gruposData[key]?.estudiantes || {});
     });
 
-    // Botón para limpiar búsqueda
     if (clearBtn) {
       clearBtn.addEventListener('click', () => {
         input.value = '';
         gruposSearchState[key] = '';
         clearBtn.style.display = 'none';
-        aplicarBusquedaGrupo(key, gruposData[key]?.estudiantes || {});
+        aplicarFiltrosGrupo(key, gruposData[key]?.estudiantes || {});
         input.focus();
       });
     }
   });
+
+  /* ── Chips de carrera ── */
+  gruposListContainer.querySelectorAll('.gc-carrera-chip').forEach(chip => {
+    chip.addEventListener('click', () => {
+      const key     = chip.dataset.key;
+      const carrera = chip.dataset.carrera;
+
+      gruposCarreraState[key] = carrera;
+
+      /* Reset búsqueda de texto */
+      const searchInput = gruposListContainer.querySelector(`.grupo-search-input[data-grupo-key="${key}"]`);
+      if (searchInput) { searchInput.value = ''; gruposSearchState[key] = ''; }
+
+      /* Actualizar estilos activos */
+      gruposListContainer
+        .querySelectorAll(`.gc-carrera-chip[data-key="${key}"]`)
+        .forEach(c => c.classList.remove('gc-chip-active'));
+      chip.classList.add('gc-chip-active');
+
+      aplicarFiltrosGrupo(key, gruposData[key]?.estudiantes || {});
+    });
+  });
 }
 
 /* ══════════════════════════════════════════════════════════════
-   LISTENERS FIREBASE
+   FIREBASE LISTENER
 ══════════════════════════════════════════════════════════════ */
 
 function iniciarListenersGrupos() {
   if (listenersGruposIniciados) return;
   listenersGruposIniciados = true;
-
   gruposOnValue(gruposRef(gruposDb, DB_GRUPOS), snapshot => {
     gruposData = snapshot.val() || {};
     renderGrupos(gruposData);
@@ -689,43 +773,32 @@ function iniciarListenersGrupos() {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   BIND DE EVENTOS
+   BIND EVENTOS
 ══════════════════════════════════════════════════════════════ */
 
 function bindEventosExcel() {
-  if (excelFileInput) excelFileInput.addEventListener('change', handleExcelFileChange);
-  if (openExcelModalBtn) openExcelModalBtn.addEventListener('click', openExcelReview);
+  if (excelFileInput)     excelFileInput.addEventListener('change', handleExcelFileChange);
+  if (openExcelModalBtn)  openExcelModalBtn.addEventListener('click', openExcelReview);
   if (closeExcelModalBtn) closeExcelModalBtn.addEventListener('click', closeExcelModal);
-  if (cancelExcelBtn) cancelExcelBtn.addEventListener('click', closeExcelModal);
-  if (excelModalBackdrop) {
-    excelModalBackdrop.addEventListener('click', e => {
-      if (e.target === excelModalBackdrop) closeExcelModal();
-    });
-  }
-  if (mapCedulaSelect) mapCedulaSelect.addEventListener('change', () => { excelState.mapping.cedula = mapCedulaSelect.value; });
-  if (mapNombresSelect) mapNombresSelect.addEventListener('change', () => { excelState.mapping.nombres = mapNombresSelect.value; });
-  if (mapCarreraSelect) mapCarreraSelect.addEventListener('change', () => { excelState.mapping.carrera = mapCarreraSelect.value; });
-  if (prepareExcelBtn) prepareExcelBtn.addEventListener('click', prepararCargaExcel);
+  if (cancelExcelBtn)     cancelExcelBtn.addEventListener('click', closeExcelModal);
+  if (excelModalBackdrop) excelModalBackdrop.addEventListener('click', e => { if (e.target === excelModalBackdrop) closeExcelModal(); });
+  if (mapCedulaSelect)    mapCedulaSelect.addEventListener('change',  () => { excelState.mapping.cedula  = mapCedulaSelect.value; });
+  if (mapNombresSelect)   mapNombresSelect.addEventListener('change', () => { excelState.mapping.nombres = mapNombresSelect.value; });
+  if (mapCarreraSelect)   mapCarreraSelect.addEventListener('change', () => { excelState.mapping.carrera = mapCarreraSelect.value; });
+  if (prepareExcelBtn)    prepareExcelBtn.addEventListener('click', prepararCargaExcel);
 }
 
 function bindEventosGrupos() {
-  if (migrarBtn) migrarBtn.addEventListener('click', openGrupoModal);
-  if (cancelarGrupoBtn) cancelarGrupoBtn.addEventListener('click', closeGrupoModal);
+  if (migrarBtn)          migrarBtn.addEventListener('click', openGrupoModal);
+  if (cancelarGrupoBtn)   cancelarGrupoBtn.addEventListener('click', closeGrupoModal);
   if (closeGrupoModalBtn) closeGrupoModalBtn.addEventListener('click', closeGrupoModal);
-  if (grupoModalBackdrop) {
-    grupoModalBackdrop.addEventListener('click', e => {
-      if (e.target === grupoModalBackdrop) closeGrupoModal();
-    });
-  }
-  if (grupoNombreInput) {
-    grupoNombreInput.addEventListener('keydown', e => {
-      if (e.key === 'Enter') confirmarGrupoBtn?.click();
-    });
-  }
-  if (confirmarGrupoBtn) confirmarGrupoBtn.addEventListener('click', confirmarMigracionGrupo);
+  if (grupoModalBackdrop) grupoModalBackdrop.addEventListener('click', e => { if (e.target === grupoModalBackdrop) closeGrupoModal(); });
+  if (grupoNombreInput)   grupoNombreInput.addEventListener('keydown', e => { if (e.key === 'Enter') confirmarGrupoBtn?.click(); });
+  if (confirmarGrupoBtn)  confirmarGrupoBtn.addEventListener('click', confirmarMigracionGrupo);
 }
 
 function iniciarExcelGrupos() {
+  injectGruposStyles();
   bindEventosExcel();
   bindEventosGrupos();
   iniciarListenersGrupos();
