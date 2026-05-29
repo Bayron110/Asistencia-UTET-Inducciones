@@ -72,7 +72,7 @@ function injectGruposStyles() {
   const style = document.createElement('style');
   style.id = 'grupos-dynamic-styles';
   style.textContent = `
-    /* KPIs */
+    /* ── KPIs ── */
     .grupo-card__kpis {
       display: flex; align-items: center;
       padding: 16px 24px 0;
@@ -92,46 +92,111 @@ function injectGruposStyles() {
     .gc-kpi--ok  .gc-kpi__val { color: #4ade80; }
     .gc-kpi--bad .gc-kpi__val { color: #f87171; }
     .gc-kpi-divider { width: 1px; height: 36px; background: rgba(255,255,255,.07); flex-shrink: 0; }
-    /* Progress bar */
+
+    /* ── Progress bar ── */
     .grupo-card__progress-row { padding: 12px 24px 0; }
     .grupo-card__progress-track {
       height: 4px; background: rgba(255,255,255,.07); border-radius: 99px; overflow: hidden;
     }
     .grupo-card__progress-fill { height: 100%; border-radius: 99px; transition: width .6s cubic-bezier(.4,0,.2,1); }
-    /* Meta icons */
+
+    /* ── Meta icons ── */
     .grupo-card__meta svg { width: 11px; height: 11px; vertical-align: -1px; margin-right: 3px; }
-    /* Panel carreras */
+
+    /* ── Panel carreras ── */
     .gc-panel {
-      background: rgba(255,255,255,.03); border: 1px solid rgba(255,255,255,.08);
-      border-radius: 14px; padding: 20px 24px 16px; margin: 0 0 20px;
+      background: rgba(255,255,255,.03);
+      border: 1px solid rgba(255,255,255,.08);
+      border-radius: 14px;
+      padding: 20px 24px 16px;
+      margin: 0 0 20px;
     }
-    .gc-panel-header { display: flex; align-items: center; gap: 10px; margin-bottom: 16px; }
+    .gc-panel-header {
+      display: flex; align-items: center; gap: 10px; margin-bottom: 16px;
+    }
     .gc-panel-title {
       display: flex; align-items: center; gap: 8px;
-      font-size: .8rem; font-weight: 700; letter-spacing: .06em;
-      text-transform: uppercase; color: #94a3b8;
+      font-size: .78rem; font-weight: 600; letter-spacing: .08em;
+      text-transform: uppercase; color: #64748b;
     }
     .gc-panel-title svg { width: 14px; height: 14px; }
     .gc-panel-count {
-      margin-left: auto; font-size: .72rem; font-weight: 600; color: #475569;
-      background: rgba(255,255,255,.05); padding: 2px 10px;
-      border-radius: 99px; border: 1px solid rgba(255,255,255,.08);
+      margin-left: auto;
+      font-size: .72rem; font-weight: 600; color: #475569;
+      background: rgba(255,255,255,.06);
+      padding: 2px 10px; border-radius: 99px;
+      border: 1px solid rgba(255,255,255,.08);
     }
-    /* Chips */
-    .gc-chips-wrap { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 20px; }
-    .gc-carrera-chip {
-      display: inline-flex; align-items: center; gap: 6px; padding: 5px 11px;
-      border-radius: 8px; border: 1px solid rgba(255,255,255,.1);
-      background: rgba(255,255,255,.04); color: #94a3b8;
+
+    /* ── Botón "Todas" ── */
+    .gc-filter-todas {
+      display: inline-flex; align-items: center; gap: 6px;
+      padding: 5px 14px; border-radius: 8px;
+      border: 1px solid rgba(255,255,255,.1);
+      background: rgba(255,255,255,.04); color: #64748b;
       font-size: .72rem; font-weight: 600; font-family: inherit;
-      cursor: pointer; transition: all .15s; white-space: nowrap; max-width: 220px;
+      cursor: pointer; transition: all .15s;
+      margin-bottom: 14px;
     }
-    .gc-carrera-chip:hover { background: rgba(255,255,255,.08); border-color: rgba(255,255,255,.2); color: #e2e8f0; }
-    .gc-carrera-chip.gc-chip-active { background: rgba(37,99,235,.18); border-color: rgba(59,130,246,.45); color: #60a5fa; }
-    .gc-chip-todas { color: #60a5fa; }
-    .gc-chip-dot { width: 7px; height: 7px; border-radius: 50%; flex-shrink: 0; }
-    .gc-chip-name { overflow: hidden; text-overflow: ellipsis; max-width: 160px; }
-    .gc-chip-pct { font-size: .68rem; font-family: 'JetBrains Mono','Fira Code',monospace; font-weight: 700; flex-shrink: 0; }
+    .gc-filter-todas:hover { background: rgba(255,255,255,.08); color: #e2e8f0; }
+    .gc-filter-todas.gc-chip-active {
+      background: rgba(37,99,235,.15);
+      border-color: rgba(59,130,246,.4);
+      color: #60a5fa;
+    }
+
+    /* ── Grid de tarjetas por carrera ── */
+    .gc-carreras-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(210px, 1fr));
+      gap: 8px;
+    }
+    .gc-carrera-card {
+      display: flex; flex-direction: column; gap: 8px;
+      padding: 12px 14px; border-radius: 10px;
+      border: 1px solid rgba(255,255,255,.08);
+      background: rgba(255,255,255,.03);
+      cursor: pointer; transition: all .15s;
+    }
+    .gc-carrera-card:hover {
+      background: rgba(255,255,255,.07);
+      border-color: rgba(255,255,255,.17);
+      transform: translateY(-1px);
+    }
+    .gc-carrera-card.gc-chip-active {
+      background: rgba(37,99,235,.1);
+      border-color: rgba(59,130,246,.4);
+    }
+    .gc-card-top {
+      display: flex; align-items: flex-start;
+      justify-content: space-between; gap: 8px;
+    }
+    .gc-card-name {
+      font-size: .75rem; font-weight: 600;
+      color: #cbd5e1; line-height: 1.35; flex: 1;
+    }
+    .gc-card-pct {
+      font-size: .95rem; font-weight: 800; flex-shrink: 0; line-height: 1;
+      font-family: 'JetBrains Mono', 'Fira Code', ui-monospace, monospace;
+    }
+    .gc-card-bar-track {
+      height: 3px; background: rgba(255,255,255,.08);
+      border-radius: 99px; overflow: hidden;
+    }
+    .gc-card-bar-fill {
+      height: 100%; border-radius: 99px;
+      transition: width .6s cubic-bezier(.4,0,.2,1);
+    }
+    .gc-card-bottom {
+      display: flex; align-items: center;
+      justify-content: space-between;
+      font-size: .68rem; color: #475569;
+    }
+    .gc-card-dot {
+      width: 6px; height: 6px; border-radius: 50%;
+      flex-shrink: 0; display: inline-block; margin-right: 4px;
+      vertical-align: middle;
+    }
   `;
   document.head.appendChild(style);
 }
@@ -177,6 +242,16 @@ function rawToTexto(v) {
 
 function normalizeHeader(v) {
   return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
+}
+
+/* Normaliza un string para comparaciones insensibles a tildes y ñ */
+function normalizeStr(v) {
+  return String(v || '')
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .replace(/ñ/gi, 'n')
+    .trim()
+    .toLowerCase();
 }
 
 function suggestHeader(headers, candidates) {
@@ -381,19 +456,21 @@ async function confirmarMigracionGrupo() {
 function calcCarrerasGrupo(estudiantes) {
   const map = {};
   Object.values(estudiantes).forEach(e => {
-    const c = (e.carrera || 'Sin carrera').trim();
-    if (!map[c]) map[c] = { total: 0, presentes: 0 };
-    map[c].total++;
-    if (e.asistencia === true) map[c].presentes++;
+    /* Clave normalizada para comparar, pero guardamos el nombre original para mostrar */
+    const raw  = (e.carrera || 'Sin carrera').trim();
+    const norm = normalizeStr(raw);
+    if (!map[norm]) map[norm] = { total: 0, presentes: 0, nombre: raw };
+    map[norm].total++;
+    if (e.asistencia === true) map[norm].presentes++;
   });
   return map;
 }
 
 function colorPct(pct) {
-  if (pct >= 80) return { text: '#4ade80', bg: 'rgba(34,197,94,.15)', border: 'rgba(34,197,94,.35)' };
-  if (pct >= 60) return { text: '#fbbf24', bg: 'rgba(245,158,11,.12)', border: 'rgba(245,158,11,.32)' };
-  if (pct >= 30) return { text: '#fb923c', bg: 'rgba(251,146,60,.12)', border: 'rgba(251,146,60,.32)' };
-  return               { text: '#f87171', bg: 'rgba(248,113,113,.12)', border: 'rgba(248,113,113,.32)' };
+  if (pct >= 80) return { text: '#4ade80', bar: '#4ade80' };
+  if (pct >= 60) return { text: '#fbbf24', bar: '#fbbf24' };
+  if (pct >= 30) return { text: '#fb923c', bar: '#fb923c' };
+  return               { text: '#f87171', bar: '#f87171' };
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -410,7 +487,7 @@ function aplicarFiltrosGrupo(key, estudiantes) {
   let entries = Object.entries(estudiantes);
 
   if (carrera !== 'todas') {
-    entries = entries.filter(([, d]) => (d.carrera || 'Sin carrera').trim() === carrera);
+    entries = entries.filter(([, d]) => normalizeStr(d.carrera || 'Sin carrera') === normalizeStr(carrera));
   }
 
   if (query) {
@@ -449,8 +526,9 @@ function aplicarFiltrosGrupo(key, estudiantes) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   PANEL DE CARRERAS — REDISEÑADO
-   Layout: tabla izquierda (nombre + barra + %) | stats pequeñas
+   PANEL DE CARRERAS — GRID DE TARJETAS
+   Cada carrera ocupa su propia tarjeta con nombre completo,
+   barra de progreso, porcentaje y conteo de presentes/total.
 ══════════════════════════════════════════════════════════════ */
 
 function buildCarrerasPanel(key, estudiantes) {
@@ -463,28 +541,39 @@ function buildCarrerasPanel(key, estudiantes) {
 
   if (!carreras.length) return '';
 
-  /* ─── chips de filtro rápido ─── */
-  const chipsHtml = carreras.map(([nombre, d]) => {
-    const pct = d.total > 0 ? Math.round((d.presentes / d.total) * 100) : 0;
-    const col = colorPct(pct);
+  /* ─── tarjetas de carrera ───
+     normKey  = clave normalizada (sin tildes/ñ) usada en data-carrera para filtrar
+     d.nombre = nombre original del Excel, con tildes y ñ correctas, para mostrar */
+  const cardsHtml = carreras.map(([normKey, d]) => {
+    const pct           = d.total > 0 ? Math.round((d.presentes / d.total) * 100) : 0;
+    const col           = colorPct(pct);
+    const nombreDisplay = escHtml(d.nombre);
     return `
-      <button
-        class="gc-carrera-chip"
+      <div
+        class="gc-carrera-card"
         data-key="${escHtml(key)}"
-        data-carrera="${escHtml(nombre)}"
-        title="${escHtml(nombre)}: ${d.presentes}/${d.total} presentes"
+        data-carrera="${escHtml(normKey)}"
+        title="${nombreDisplay}"
       >
-        <span class="gc-chip-dot" style="background:${col.text};"></span>
-        <span class="gc-chip-name">${escHtml(nombre)}</span>
-        <span class="gc-chip-pct" style="color:${col.text};">${pct}%</span>
-      </button>`;
+        <div class="gc-card-top">
+          <span class="gc-card-name">${nombreDisplay}</span>
+          <span class="gc-card-pct" style="color:${col.text};">${pct}%</span>
+        </div>
+        <div class="gc-card-bar-track">
+          <div class="gc-card-bar-fill" style="width:${pct}%;background:${col.bar};"></div>
+        </div>
+        <div class="gc-card-bottom">
+          <span>
+            <span class="gc-card-dot" style="background:${col.text};"></span>
+            ${d.presentes} presente${d.presentes !== 1 ? 's' : ''}
+          </span>
+          <span>${d.total} total</span>
+        </div>
+      </div>`;
   }).join('');
-
-  /* ─── filas de la tabla de barras ─── */
 
   return `
     <div class="gc-panel">
-      <!-- Encabezado del panel -->
       <div class="gc-panel-header">
         <div class="gc-panel-title">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
@@ -497,16 +586,24 @@ function buildCarrerasPanel(key, estudiantes) {
         <span class="gc-panel-count">${carreras.length} ${carreras.length === 1 ? 'carrera' : 'carreras'}</span>
       </div>
 
-      <!-- Chips de filtro (scroll horizontal en móvil) -->
-      <div class="gc-chips-wrap">
-        <button
-          class="gc-carrera-chip gc-chip-todas gc-chip-active"
-          data-key="${escHtml(key)}"
-          data-carrera="todas"
-        >
-          <span class="gc-chip-name">Todas</span>
-        </button>
-        ${chipsHtml}
+      <!-- Botón "Todas" -->
+      <button
+        class="gc-filter-todas gc-chip-active"
+        data-key="${escHtml(key)}"
+        data-carrera="todas"
+      >
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <line x1="3" y1="6" x2="21" y2="6"/>
+          <line x1="3" y1="12" x2="21" y2="12"/>
+          <line x1="3" y1="18" x2="21" y2="18"/>
+        </svg>
+        Todas las carreras
+      </button>
+
+      <!-- Grid de tarjetas -->
+      <div class="gc-carreras-grid">
+        ${cardsHtml}
       </div>
     </div>
   `;
@@ -538,7 +635,7 @@ function buildGrupoBodyContent(key, estudiantes) {
   return `
     ${buildCarrerasPanel(key, estudiantes)}
 
-    <!-- Barra búsqueda -->
+    <!-- Barra de búsqueda -->
     <div class="grupo-search-bar">
       <div class="grupo-search-wrap">
         <svg class="grupo-search-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor"
@@ -573,7 +670,14 @@ function buildGrupoBodyContent(key, estudiantes) {
     <div class="table-scroll" style="margin-top:0">
       <table class="data-table">
         <thead>
-          <tr><th>#</th><th>Cédula</th><th>Nombre</th><th>Carrera</th><th>Telegram</th><th>Asistencia</th></tr>
+          <tr>
+            <th>#</th>
+            <th>Cédula</th>
+            <th>Nombre</th>
+            <th>Carrera</th>
+            <th>Telegram</th>
+            <th>Asistencia</th>
+          </tr>
         </thead>
         <tbody>${filas}</tbody>
       </table>
@@ -653,31 +757,24 @@ function renderGrupos(data) {
           </button>
         </div>
 
-        <!-- ╔══ STATS + BARRA ══╗ -->
+        <!-- ╔══ KPIs + BARRA ══╗ -->
         <div class="grupo-card__kpis">
-          <!-- Stat: Total -->
           <div class="gc-kpi">
             <div class="gc-kpi__val">${total}</div>
             <div class="gc-kpi__lbl">Total</div>
           </div>
-          <!-- Divider -->
           <div class="gc-kpi-divider"></div>
-          <!-- Stat: Asistieron -->
           <div class="gc-kpi gc-kpi--ok">
             <div class="gc-kpi__val">${asistieron}</div>
             <div class="gc-kpi__lbl">Asistieron</div>
           </div>
-          <!-- Divider -->
           <div class="gc-kpi-divider"></div>
-          <!-- Stat: Ausentes -->
           <div class="gc-kpi gc-kpi--bad">
             <div class="gc-kpi__val">${ausentes}</div>
             <div class="gc-kpi__lbl">Ausentes</div>
           </div>
-          <!-- Divider -->
           <div class="gc-kpi-divider"></div>
-          <!-- Stat: Porcentaje (prominente) -->
-          <div class="gc-kpi gc-kpi--pct" style="--kpi-color:${col.text};">
+          <div class="gc-kpi" style="--kpi-color:${col.text};">
             <div class="gc-kpi__val gc-kpi__val--pct">${pct}%</div>
             <div class="gc-kpi__lbl">Asistencia</div>
           </div>
@@ -687,7 +784,7 @@ function renderGrupos(data) {
         <div class="grupo-card__progress-row">
           <div class="grupo-card__progress-track">
             <div class="grupo-card__progress-fill"
-              style="width:${pct}%;background:${col.text};box-shadow:0 0 10px ${col.text}55;">
+              style="width:${pct}%;background:${col.text};">
             </div>
           </div>
         </div>
@@ -736,23 +833,43 @@ function renderGrupos(data) {
     }
   });
 
-  /* ── Chips de carrera ── */
-  gruposListContainer.querySelectorAll('.gc-carrera-chip').forEach(chip => {
-    chip.addEventListener('click', () => {
-      const key     = chip.dataset.key;
-      const carrera = chip.dataset.carrera;
+  /* ── Filtro "Todas las carreras" ── */
+  gruposListContainer.querySelectorAll('.gc-filter-todas').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const key = btn.dataset.key;
+      gruposCarreraState[key] = 'todas';
+
+      /* Limpiar búsqueda de texto */
+      const searchInput = gruposListContainer.querySelector(`.grupo-search-input[data-grupo-key="${key}"]`);
+      if (searchInput) { searchInput.value = ''; gruposSearchState[key] = ''; }
+
+      /* Actualizar estilos */
+      gruposListContainer.querySelectorAll(`.gc-carrera-card[data-key="${key}"]`)
+        .forEach(c => c.classList.remove('gc-chip-active'));
+      btn.classList.add('gc-chip-active');
+
+      aplicarFiltrosGrupo(key, gruposData[key]?.estudiantes || {});
+    });
+  });
+
+  /* ── Filtro por tarjeta de carrera ── */
+  gruposListContainer.querySelectorAll('.gc-carrera-card').forEach(card => {
+    card.addEventListener('click', () => {
+      const key     = card.dataset.key;
+      const carrera = card.dataset.carrera;
 
       gruposCarreraState[key] = carrera;
 
-      /* Reset búsqueda de texto */
+      /* Limpiar búsqueda de texto */
       const searchInput = gruposListContainer.querySelector(`.grupo-search-input[data-grupo-key="${key}"]`);
       if (searchInput) { searchInput.value = ''; gruposSearchState[key] = ''; }
 
       /* Actualizar estilos activos */
-      gruposListContainer
-        .querySelectorAll(`.gc-carrera-chip[data-key="${key}"]`)
+      gruposListContainer.querySelectorAll(`.gc-carrera-card[data-key="${key}"]`)
         .forEach(c => c.classList.remove('gc-chip-active'));
-      chip.classList.add('gc-chip-active');
+      gruposListContainer.querySelectorAll(`.gc-filter-todas[data-key="${key}"]`)
+        .forEach(b => b.classList.remove('gc-chip-active'));
+      card.classList.add('gc-chip-active');
 
       aplicarFiltrosGrupo(key, gruposData[key]?.estudiantes || {});
     });
