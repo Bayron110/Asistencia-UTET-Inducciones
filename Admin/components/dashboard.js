@@ -1089,6 +1089,118 @@ function montarHTML(){
         font-weight: 700;
         flex-shrink: 0;
       }
+        /* ═══════════════════════════════════════
+   RESPONSIVE — agregar al final del <style>
+═══════════════════════════════════════ */
+
+/* Tablets anchas: 900–1100px */
+@media (max-width: 1100px) {
+  .dash-main-row {
+    grid-template-columns: 300px 1fr !important;
+  }
+}
+
+/* Tablets: < 900px — columna izquierda se va arriba */
+@media (max-width: 900px) {
+  .dash-main-row {
+    grid-template-columns: 1fr !important;
+  }
+
+  .dash-left-col {
+    display: grid !important;
+    grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
+    gap: 14px;
+  }
+}
+
+/* Móvil: < 640px */
+@media (max-width: 640px) {
+  .dash-kpi-row {
+    grid-template-columns: 1fr 1fr !important;
+  }
+
+  .dash-main-row {
+    grid-template-columns: 1fr !important;
+    gap: 12px !important;
+  }
+
+  .dash-left-col {
+    display: flex !important;
+    flex-direction: column !important;
+  }
+
+  .dash-donut-card {
+    padding: 16px !important;
+  }
+
+  .dash-table-head {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  .dash-search-wrap {
+    width: 100% !important;
+  }
+
+  #dashSearch {
+    width: 100% !important;
+  }
+
+  .dash-section-hd {
+    flex-direction: column !important;
+    align-items: flex-start !important;
+    gap: 10px !important;
+  }
+
+  .dash-section-filters {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  .dv-leyenda {
+    display: none !important;
+  }
+
+  .dgh-card {
+    border-radius: 12px !important;
+  }
+
+  .dgh-stats {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  .daf-list {
+    max-height: 220px !important;
+  }
+}
+
+/* Móvil pequeño: < 400px */
+@media (max-width: 400px) {
+  .dash-kpi-row {
+    grid-template-columns: 1fr 1fr !important;
+    gap: 8px !important;
+  }
+
+  .dash-kpi__num {
+    font-size: 1.6rem !important;
+  }
+
+  .dash-filter-row {
+    flex-wrap: wrap !important;
+    gap: 6px !important;
+  }
+
+  .dv-chips {
+    gap: 5px !important;
+  }
+
+  .dv-chip {
+    font-size: .7rem !important;
+    padding: 5px 9px !important;
+  }
+}
     </style>
   `;
 

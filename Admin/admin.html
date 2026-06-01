@@ -35,7 +35,8 @@
       <h1 class="login-title">Acceso Admin</h1>
 
       <!-- MENSAJE PARA REGISTRO DEL PRIMER ADMIN -->
-      <div class="login-err" id="registerHint" style="width:100%; text-align:left; min-height:auto; margin-bottom:8px; color:#cbd5e1;">
+      <div class="login-err" id="registerHint"
+        style="width:100%; text-align:left; min-height:auto; margin-bottom:8px; color:#cbd5e1;">
         Verificando administrador...
       </div>
 
@@ -109,9 +110,9 @@
             <circle cx="9" cy="7" r="4" />
             <path d="M23 21v-2a4 4 0 00-3-3.87M16 3.13a4 4 0 010 7.75" />
           </svg>
-          Registros
+          <span>Registros</span>
         </a>
-        
+
 
         <a class="nav-item" data-tab="sesion" href="#">
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
@@ -119,7 +120,7 @@
             <circle cx="12" cy="12" r="10" />
             <polyline points="12 6 12 12 16 14" />
           </svg>
-          Control de Sesión
+          <span>Control de Sesión</span>
         </a>
 
         <a class="nav-item" data-tab="excel" href="#">
@@ -131,7 +132,7 @@
             <line x1="8" y1="17" x2="16" y2="17"></line>
             <line x1="10" y1="9" x2="11" y2="9"></line>
           </svg>
-          Carga Excel
+          <span>Carga Excel</span>
         </a>
 
         <a class="nav-item" data-tab="grupos" href="#">
@@ -142,18 +143,18 @@
             <path d="M23 21v-2a4 4 0 00-3-3.87" />
             <path d="M16 3.13a4 4 0 010 7.75" />
           </svg>
-          Grupos
+          <span> Grupos </span>
         </a>
-        
+
         <a class="nav-item" data-tab="dashboard" href="#">
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
-              stroke-linecap="round" stroke-linejoin="round">
-            <rect x="2" y="3" width="8" height="8" rx="1.5"/>
-            <rect x="14" y="3" width="8" height="8" rx="1.5"/>
-            <rect x="2" y="14" width="8" height="7" rx="1.5"/>
-            <rect x="14" y="14" width="8" height="7" rx="1.5"/>
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+            stroke-linejoin="round">
+            <rect x="2" y="3" width="8" height="8" rx="1.5" />
+            <rect x="14" y="3" width="8" height="8" rx="1.5" />
+            <rect x="2" y="14" width="8" height="7" rx="1.5" />
+            <rect x="14" y="14" width="8" height="7" rx="1.5" />
           </svg>
-          Dashboard
+          <span> Dashboard </span>
         </a>
       </nav>
 
@@ -164,7 +165,13 @@
           <polyline points="16 17 21 12 16 7" />
           <line x1="21" y1="12" x2="9" y2="12" />
         </svg>
-        Cerrar sesión
+        <span> Cerrar sesión </span>
+      </button>
+      <button class="sidebar__collapse-btn" id="collapseBtn" title="Colapsar menú">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+          stroke-linejoin="round" width="16" height="16">
+          <path d="M15 18l-6-6 6-6" />
+        </svg>
       </button>
     </aside>
 
@@ -238,7 +245,7 @@
                 </svg>
                 Exportar
               </button>
-              
+
 
               <button class="action-btn action-btn--add" id="agregarManualBtn">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
@@ -345,7 +352,8 @@
               Programar cierre automático
             </div>
 
-            <p class="sesion-hint">Abre el formulario y define cuánto tiempo estará disponible. Al vencer el tiempo, se bloquearará automáticamente.</p>
+            <p class="sesion-hint">Abre el formulario y define cuánto tiempo estará disponible. Al vencer el tiempo, se
+              bloquearará automáticamente.</p>
 
             <div class="timer-options">
               <button class="timer-chip" data-min="5">5 min</button>
@@ -378,39 +386,34 @@
               </div>
             </div>
           </div>
-<!-- CARD URL FORMULARIO -->
-<div class="sesion-card">
-  <div class="sesion-card__header">
-    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-      stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
-      <path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4" />
-      <path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 20" />
-    </svg>
-    URL del formulario
-  </div>
+          <!-- CARD URL FORMULARIO -->
+          <div class="sesion-card">
+            <div class="sesion-card__header">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"
+                stroke-linejoin="round">
+                <path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4" />
+                <path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 20" />
+              </svg>
+              URL del formulario
+            </div>
 
-  <p class="sesion-hint">
-    Comparte este enlace con los estudiantes para registrar asistencia.
-  </p>
+            <p class="sesion-hint">
+              Comparte este enlace con los estudiantes para registrar asistencia.
+            </p>
 
-  <div class="url-box">
-    <input
-      type="text"
-      id="formUrlInput"
-      readonly
-      value="https://registroinduccionesitsqmet.netlify.app/"
-    >
+            <div class="url-box">
+              <input type="text" id="formUrlInput" readonly value="https://registroinduccionesitsqmet.netlify.app/">
 
-    <button class="action-btn action-btn--timer" id="copyUrlBtn">
-      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-        <rect x="9" y="9" width="13" height="13" rx="2"></rect>
-        <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-      </svg>
-      Copiar URL
-    </button>
-  </div>
-</div>
+              <button class="action-btn action-btn--timer" id="copyUrlBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                Copiar URL
+              </button>
+            </div>
+          </div>
         </div>
       </section>
       <!-- TAB: EXCEL -->
@@ -435,7 +438,8 @@
               </div>
 
               <p class="sesion-hint">
-                Sube un archivo <strong>.xls</strong> o <strong>.xlsx</strong> que contenga columnas como cédula, nombres y carrera.
+                Sube un archivo <strong>.xls</strong> o <strong>.xlsx</strong> que contenga columnas como cédula,
+                nombres y carrera.
               </p>
 
               <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap; margin-top:16px;">
@@ -479,7 +483,7 @@
         </div>
       </section>
 
-            <section class="tab-panel" id="tab-dashboard">
+      <section class="tab-panel" id="tab-dashboard">
         <!-- El contenido se monta dinámicamente por dashboard.js -->
       </section>
     </main>
@@ -590,13 +594,8 @@
           <label for="grupoNombreInput" class="grupo-modal__label">
             Nombre del grupo
           </label>
-          <input
-            type="text"
-            id="grupoNombreInput"
-            class="grupo-modal__input"
-            placeholder="Ej: Grupo Ingeniería — Marzo 2026"
-            maxlength="80"
-          >
+          <input type="text" id="grupoNombreInput" class="grupo-modal__input"
+            placeholder="Ej: Grupo Ingeniería — Marzo 2026" maxlength="80">
           <div class="grupo-modal__hint">Usa un nombre descriptivo que identifique la cohorte o fecha.</div>
         </div>
       </div>
@@ -645,12 +644,14 @@
 
             <div class="manual-field">
               <label for="manualNombre">Nombres completos <span class="manual-required">*</span></label>
-              <input type="text" id="manualNombre" placeholder="Ej: María José Pérez Torres" maxlength="100" autocomplete="off">
+              <input type="text" id="manualNombre" placeholder="Ej: María José Pérez Torres" maxlength="100"
+                autocomplete="off">
             </div>
 
             <div class="manual-field">
               <label for="manualCarrera">Carrera <span class="manual-required">*</span></label>
-              <input type="text" id="manualCarrera" placeholder="Ej: Ingeniería en Sistemas" maxlength="100" autocomplete="off">
+              <input type="text" id="manualCarrera" placeholder="Ej: Ingeniería en Sistemas" maxlength="100"
+                autocomplete="off">
             </div>
 
             <div class="manual-field">
@@ -694,40 +695,79 @@
   <script src="https://cdn.jsdelivr.net/npm/xlsx/dist/xlsx.full.min.js"></script>
 
   <!-- Hamburger logic -->
+  <!-- Hamburger logic + Sidebar collapse -->
   <script>
     const hamburgerBtn = document.getElementById('hamburgerBtn');
     const sidebar = document.getElementById('sidebar');
     const overlay = document.getElementById('sidebarOverlay');
+    const dashboard = document.getElementById('dashboard');
 
+    /* ── MOBILE: abrir/cerrar overlay ── */
     function openSidebar() {
       sidebar.classList.add('open');
       overlay.classList.add('visible');
     }
-
     function closeSidebar() {
       sidebar.classList.remove('open');
       overlay.classList.remove('visible');
     }
 
-    if (hamburgerBtn) hamburgerBtn.addEventListener('click', openSidebar);
     if (overlay) overlay.addEventListener('click', closeSidebar);
-
     document.querySelectorAll('.nav-item').forEach(item => {
       item.addEventListener('click', () => {
-        if (window.innerWidth <= 640) closeSidebar();
+        if (window.innerWidth <= 768) closeSidebar();
       });
     });
+
+    /* ── DESKTOP: colapsar/expandir sidebar ── */
+    const COLLAPSED_KEY = 'sidebar_collapsed';
+    let collapsed = localStorage.getItem(COLLAPSED_KEY) === 'true';
+
+    function applyCollapsed() {
+      if (collapsed) {
+        sidebar.classList.add('sidebar--collapsed');
+        dashboard.classList.add('dashboard--sidebar-collapsed');
+      } else {
+        sidebar.classList.remove('sidebar--collapsed');
+        dashboard.classList.remove('dashboard--sidebar-collapsed');
+      }
+    }
+
+    // Al cargar, restaurar estado guardado
+    applyCollapsed();
+
+    if (hamburgerBtn) {
+      hamburgerBtn.addEventListener('click', () => {
+        if (window.innerWidth <= 768) {
+          // Móvil: comportamiento original
+          sidebar.classList.contains('open') ? closeSidebar() : openSidebar();
+        } else {
+          // Desktop: colapsar/expandir
+          collapsed = !collapsed;
+          localStorage.setItem(COLLAPSED_KEY, collapsed);
+          applyCollapsed();
+        }
+      });
+    }
+    const collapseBtn = document.getElementById('collapseBtn');
+if (collapseBtn) {
+  collapseBtn.addEventListener('click', () => {
+    collapsed = !collapsed;
+    localStorage.setItem(COLLAPSED_KEY, collapsed);
+    applyCollapsed();
+  });
+}
   </script>
-<script>
-  const copyUrlBtn = document.getElementById('copyUrlBtn');
-  const formUrlInput = document.getElementById('formUrlInput');
+  <script>
+    const copyUrlBtn = document.getElementById('copyUrlBtn');
+    const formUrlInput = document.getElementById('formUrlInput');
 
-  if (copyUrlBtn) {
-    copyUrlBtn.addEventListener('click', async () => {
-      try {
-        await navigator.clipboard.writeText(formUrlInput.value);
+    if (copyUrlBtn) {
+      copyUrlBtn.addEventListener('click', async () => {
+        try {
+          await navigator.clipboard.writeText(formUrlInput.value);
 
-        copyUrlBtn.innerHTML = `
+          copyUrlBtn.innerHTML = `
           <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
             stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
             <polyline points="20 6 9 17 4 12"></polyline>
@@ -735,8 +775,8 @@
           ¡Copiado!
         `;
 
-        setTimeout(() => {
-          copyUrlBtn.innerHTML = `
+          setTimeout(() => {
+            copyUrlBtn.innerHTML = `
             <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
               stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
               <rect x="9" y="9" width="13" height="13" rx="2"></rect>
@@ -744,14 +784,14 @@
             </svg>
             Copiar URL
           `;
-        }, 2000);
+          }, 2000);
 
-      } catch (err) {
-        alert('No se pudo copiar la URL');
-      }
-    });
-  }
-</script>
+        } catch (err) {
+          alert('No se pudo copiar la URL');
+        }
+      });
+    }
+  </script>
   <script type="module" src="admin.js"></script>
 </body>
 
