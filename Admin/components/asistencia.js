@@ -36,6 +36,26 @@ function escHtml(str) {
     .replace(/"/g, '&quot;');
 }
 
+/**
+ * Formatea un timestamp (ms) o null a una cadena legible.
+ * Devuelve '–' si no hay valor.
+ */
+function formatFecha(ts) {
+  if (!ts) return '–';
+  try {
+    const d = new Date(ts);
+    return d.toLocaleString('es-EC', {
+      day:    '2-digit',
+      month:  '2-digit',
+      year:   'numeric',
+      hour:   '2-digit',
+      minute: '2-digit'
+    });
+  } catch {
+    return '–';
+  }
+}
+
 function toast(msg, type = 'info') {
   const toastContainer = $('toastContainer');
   if (!toastContainer) return;
@@ -64,7 +84,6 @@ function toast(msg, type = 'info') {
 ══════════════════════════════════════════════════════════════ */
 
 function montarFilterBar() {
-  // Insertar barra de filtros encima de la tabla (si no existe aún)
   if ($('filterBarRegistros')) return;
 
   const tableWrap = document.querySelector('#tab-registros .table-wrap');
@@ -90,9 +109,13 @@ function montarFilterBar() {
       Pendientes
       <span class="filter-btn__count" id="filterCountAusentes">0</span>
     </button>
+    <button class="filter-btn filter-btn--retirados" data-filtro="retirados">
+      <span class="filter-btn__dot"></span>
+      Retirados
+      <span class="filter-btn__count" id="filterCountRetirados">0</span>
+    </button>
   `;
 
-  // Insertar antes del table-header
   const tableHeader = tableWrap.querySelector('.table-header');
   if (tableHeader) {
     tableWrap.insertBefore(bar, tableHeader);
@@ -100,12 +123,10 @@ function montarFilterBar() {
     tableWrap.prepend(bar);
   }
 
-  // Bind de clicks
   bar.querySelectorAll('.filter-btn').forEach(btn => {
     btn.addEventListener('click', () => {
       filtroActivo = btn.dataset.filtro;
 
-      // Actualizar clases activas
       bar.querySelectorAll('.filter-btn').forEach(b => {
         b.className = b.className
           .replace(/active-filter-\S+/g, '')
@@ -120,18 +141,22 @@ function montarFilterBar() {
 }
 
 function actualizarCountsFiltro(data) {
-  const entries    = Object.values(data);
-  const total      = entries.length;
-  const presentes  = entries.filter(v => v.asistencia === true).length;
-  const ausentes   = total - presentes;
+  const entries   = Object.values(data);
+  const total     = entries.length;
+  const retirados = entries.filter(v => v.retirado === true).length;
+  const activos   = entries.filter(v => v.retirado !== true);
+  const presentes = activos.filter(v => v.asistencia === true).length;
+  const ausentes  = activos.filter(v => v.asistencia !== true).length;
 
   const elTodos     = $('filterCountTodos');
   const elPresentes = $('filterCountPresentes');
   const elAusentes  = $('filterCountAusentes');
+  const elRetirados = $('filterCountRetirados');
 
   if (elTodos)     elTodos.textContent     = total;
   if (elPresentes) elPresentes.textContent = presentes;
   if (elAusentes)  elAusentes.textContent  = ausentes;
+  if (elRetirados) elRetirados.textContent = retirados;
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -144,10 +169,14 @@ function recomputeRegistros() {
   Object.entries(adminEstudiantes).forEach(([cedula, adminData]) => {
     merged[cedula] = {
       cedula,
-      nombre:     adminData.nombres  || adminData.nombre  || '',
-      carrera:    adminData.carrera  || '',
-      telegram:   adminData.telegram || '',
-      asistencia: adminData.asistencia === true
+      nombre:        adminData.nombres      || adminData.nombre  || '',
+      carrera:       adminData.carrera      || '',
+      telegram:      adminData.telegram     || '',
+      asistencia:    adminData.asistencia   === true,
+      retirado:      adminData.retirado     === true,
+      // ── NUEVO: timestamps ──
+      fechaRegistro: adminData.fechaRegistro     || null, // cuándo se cargó en admin_estudiantes
+      fechaAsistencia: adminData.fechaAsistencia || null  // cuándo el alumno marcó asistencia
     };
   });
 
@@ -165,10 +194,13 @@ function renderTable(data, filter = '') {
 
   // Aplicar filtro activo
   if (filtroActivo === 'presentes') {
-    entries = entries.filter(([, v]) => v.asistencia === true);
+    entries = entries.filter(([, v]) => v.asistencia === true && v.retirado !== true);
   } else if (filtroActivo === 'ausentes') {
-    entries = entries.filter(([, v]) => v.asistencia !== true);
+    entries = entries.filter(([, v]) => v.asistencia !== true && v.retirado !== true);
+  } else if (filtroActivo === 'retirados') {
+    entries = entries.filter(([, v]) => v.retirado === true);
   }
+  // 'todos' => sin filtro adicional
 
   // Aplicar búsqueda
   const filtrado = filter
@@ -195,12 +227,26 @@ function renderTable(data, filter = '') {
   filtrado.forEach(([cedula, d], i) => {
     const isNew      = newKeys.includes(cedula);
     const asistencia = d.asistencia === true;
+    const retirado   = d.retirado   === true;
 
     const tr = document.createElement('tr');
     if (isNew) tr.classList.add('row-new');
+    if (asistencia && !retirado) tr.classList.add('row-presente');
+    if (retirado) tr.classList.add('row-retirado');
 
-    // Pintar fila verde si el estudiante ya registró asistencia
-    if (asistencia) tr.classList.add('row-presente');
+    // ── Columna fecha: muestra fechaAsistencia si asistió, si no fechaRegistro
+    const fechaMostrar = asistencia
+      ? formatFecha(d.fechaAsistencia || d.fechaRegistro)
+      : formatFecha(d.fechaRegistro);
+
+    // ── Badge estado vigente/retirado
+    const estadoBadge = retirado
+      ? `<span class="tag-retirado">Retirado</span>`
+      : `<span class="tag-vigente">Vigente</span>`;
+
+    // ── Botón toggle vigente↔retirado
+    const toggleLabel = retirado ? 'Activar' : 'Retirar';
+    const toggleClass = retirado ? 'toggle-btn toggle-btn--activar' : 'toggle-btn toggle-btn--retirar';
 
     tr.innerHTML =
       '<td>' + (i + 1) + '</td>' +
@@ -211,27 +257,46 @@ function renderTable(data, filter = '') {
       '<td>' + escHtml(d.nombre   || '–') + '</td>' +
       '<td>' + escHtml(d.carrera  || '–') + '</td>' +
       '<td class="badge-telegram">' + escHtml(d.telegram || '–') + '</td>' +
+      // ── COLUMNA NUEVA: Fecha/Hora
+      '<td class="col-fecha">' +
+        '<span class="fecha-badge">' + escHtml(fechaMostrar) + '</span>' +
+      '</td>' +
       '<td>' +
         '<span class="' + (asistencia ? 'tag-asistencia-ok' : 'tag-asistencia-no') + '">' +
           (asistencia ? 'Presente' : 'Pendiente') +
         '</span>' +
       '</td>' +
-      '<td>' +
+      // ── COLUMNA NUEVA: Estado
+      '<td>' + estadoBadge + '</td>' +
+      '<td class="col-acciones">' +
         '<button class="del-btn" data-key="' + escHtml(cedula) + '">Reiniciar</button>' +
+        '<button class="' + toggleClass + '" data-key="' + escHtml(cedula) + '" data-retirado="' + retirado + '">' +
+          toggleLabel +
+        '</button>' +
       '</td>';
 
     tableBody.appendChild(tr);
   });
 
+  // Bind reiniciar
   tableBody.querySelectorAll('.del-btn').forEach(btn => {
     btn.addEventListener('click', () => deleteRegistro(btn.dataset.key));
+  });
+
+  // Bind toggle vigente/retirado
+  tableBody.querySelectorAll('.toggle-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      const estaRetirado = btn.dataset.retirado === 'true';
+      toggleRetirado(btn.dataset.key, estaRetirado);
+    });
   });
 }
 
 function updateStats(data) {
   const entries    = Object.values(data);
-  const total      = entries.length;
-  const asistieron = entries.filter(v => v.asistencia === true).length;
+  const activos    = entries.filter(v => v.retirado !== true);
+  const total      = activos.length;
+  const asistieron = activos.filter(v => v.asistencia === true).length;
   const pendientes = total - asistieron;
 
   if (statTotal)    statTotal.textContent    = total;
@@ -248,14 +313,45 @@ async function deleteRegistro(cedula) {
 
   try {
     await adminUpdate(adminRef(adminDb, DB_ADMIN_ESTUDIANTES + '/' + cedula), {
-      telegram:   '',
-      asistencia: false
+      telegram:        '',
+      asistencia:      false,
+      fechaAsistencia: null
     });
 
     toast('Asistencia reiniciada.', 'warn');
   } catch (err) {
     console.error(err);
     toast('Error al reiniciar asistencia.', 'error');
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TOGGLE VIGENTE / RETIRADO  ← NUEVO
+══════════════════════════════════════════════════════════════ */
+
+async function toggleRetirado(cedula, estaRetirado) {
+  const nuevoEstado = !estaRetirado;
+  const msg = nuevoEstado
+    ? '¿Marcar como RETIRADO a la cédula ' + cedula + '?\nEl estudiante dejará de aparecer en los conteos activos.'
+    : '¿Volver a ACTIVAR a la cédula ' + cedula + '?';
+
+  if (!confirm(msg)) return;
+
+  try {
+    await adminUpdate(adminRef(adminDb, DB_ADMIN_ESTUDIANTES + '/' + cedula), {
+      retirado:          nuevoEstado,
+      fechaRetiro:       nuevoEstado ? Date.now() : null
+    });
+
+    toast(
+      nuevoEstado
+        ? 'Estudiante marcado como retirado.'
+        : 'Estudiante reactivado correctamente.',
+      nuevoEstado ? 'warn' : 'success'
+    );
+  } catch (err) {
+    console.error(err);
+    toast('Error al cambiar el estado del estudiante.', 'error');
   }
 }
 
@@ -277,12 +373,16 @@ function exportarExcel() {
   }
 
   const rows = entries.map(([cedula, d], i) => ({
-    '#':          i + 1,
-    'Cédula':     cedula,
-    'Nombre':     d.nombre   || '',
-    'Carrera':    d.carrera  || '',
-    'Telegram':   d.telegram || '',
-    'Asistencia': d.asistencia === true ? 'Sí' : 'No'
+    '#':            i + 1,
+    'Cédula':       cedula,
+    'Nombre':       d.nombre   || '',
+    'Carrera':      d.carrera  || '',
+    'Telegram':     d.telegram || '',
+    'Asistencia':   d.asistencia === true ? 'Sí' : 'No',
+    // ── NUEVAS COLUMNAS en Excel
+    'Fecha Registro':   formatFecha(d.fechaRegistro),
+    'Fecha Asistencia': formatFecha(d.fechaAsistencia),
+    'Estado':           d.retirado === true ? 'Retirado' : 'Vigente'
   }));
 
   const ws = XLSX.utils.json_to_sheet(rows);
@@ -379,14 +479,19 @@ async function confirmarRegistroManual() {
     confirmarManualBtn.textContent = 'Guardando...';
   }
 
+  const ahora = Date.now();
+
   try {
     await adminUpdate(adminRef(adminDb, DB_ADMIN_ESTUDIANTES + '/' + cedula), {
       nombres:            nombre,
       carrera,
       telegram:           telegram || '',
       asistencia:         asistio,
+      retirado:           false,
       registradoPorAdmin: true,
-      fechaRegistro:      Date.now()
+      fechaRegistro:      ahora,
+      // Si se marca asistencia al registrar, guardar también fechaAsistencia
+      fechaAsistencia:    asistio ? ahora : null
     });
 
     toast('Estudiante "' + nombre + '" registrado correctamente.', 'success');

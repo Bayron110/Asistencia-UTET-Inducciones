@@ -278,8 +278,10 @@
                   <th>Nombre</th>
                   <th>Carrera</th>
                   <th>Telegram</th>
+                  <th class="col-fecha">Fecha / Hora</th>
                   <th>Asistencia</th>
-                  <th>Acción</th>
+                  <th>Estado</th>
+                  <th class="col-acciones">Acción</th>
                 </tr>
               </thead>
               <tbody id="tableBody">
@@ -750,13 +752,13 @@
       });
     }
     const collapseBtn = document.getElementById('collapseBtn');
-if (collapseBtn) {
-  collapseBtn.addEventListener('click', () => {
-    collapsed = !collapsed;
-    localStorage.setItem(COLLAPSED_KEY, collapsed);
-    applyCollapsed();
-  });
-}
+    if (collapseBtn) {
+      collapseBtn.addEventListener('click', () => {
+        collapsed = !collapsed;
+        localStorage.setItem(COLLAPSED_KEY, collapsed);
+        applyCollapsed();
+      });
+    }
   </script>
   <script>
     const copyUrlBtn = document.getElementById('copyUrlBtn');

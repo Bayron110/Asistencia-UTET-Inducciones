@@ -203,13 +203,16 @@ async function obtenerEstudianteAdmin(cedula) {
   return snapshot.exists() ? snapshot.val() : null;
 }
 
+// DESPUÉS
 async function actualizarAdminEstudiante(cedula, nombre, carrera, telegram) {
   await set(ref(db, `${CONFIG.DB_ADMIN_PATH}/${cedula}`), {
     cedula,
     nombres: nombre,
     carrera,
     telegram,
-    asistencia: true
+    asistencia: true,
+    fechaRegistro: new Date().toISOString(),          // "2025-06-02T14:35:22.000Z"
+    timestampRegistro: Date.now()                      // 1748872522000  (ms desde epoch)
   });
 }
 
