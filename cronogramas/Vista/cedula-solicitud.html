@@ -1,0 +1,68 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Acceso a Cronograma</title>
+
+    <link rel="stylesheet"
+        href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+
+    <link rel="stylesheet" href="../estilos/cedula.css">
+</head>
+<body>
+
+    <canvas id="reactorBg"></canvas>
+
+    <div class="cedula-wrapper">
+
+        <div class="cedula-card">
+
+            <div class="cedula-icon">
+                <i class="ti ti-id-badge-2"></i>
+            </div>
+
+            <h1 class="cedula-titulo">Consulta tu Cronograma</h1>
+            <p class="cedula-subtitulo">Ingresa tu número de cédula para ver las actividades académicas asignadas a ti.</p>
+
+            <div class="cedula-form">
+
+                <div class="input-grupo" id="inputGrupo">
+                    <i class="ti ti-credit-card input-icono"></i>
+                    <input
+                        type="text"
+                        id="inputCedula"
+                        class="cedula-input"
+                        placeholder="0000000000"
+                        maxlength="10"
+                        inputmode="numeric"
+                        autocomplete="off"
+                    />
+                    <span class="input-contador" id="contador">0/10</span>
+                </div>
+
+                <p class="error-msg oculto" id="errorMsg">
+                    <i class="ti ti-alert-circle"></i>
+                    <span id="errorTexto"></span>
+                </p>
+
+                <button class="btn-consultar" id="btnConsultar" disabled>
+                    <span class="btn-texto">
+                        <i class="ti ti-search"></i>
+                        Consultar cronograma
+                    </span>
+                    <span class="btn-loading oculto">
+                        <i class="ti ti-loader-2 spin"></i>
+                        Buscando...
+                    </span>
+                </button>
+
+            </div>
+
+        </div>
+
+    </div>
+
+    <script type="module" src="../authentificacion/validar-cedula.js"></script>
+</body>
+</html>

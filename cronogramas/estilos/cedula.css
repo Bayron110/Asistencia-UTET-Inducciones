@@ -1,0 +1,335 @@
+/* ── cedula.css ── */
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+    --cyan: #00e5ff;
+    --cyan-dim: rgba(0,229,255,0.15);
+    --cyan-glow: rgba(0,229,255,0.08);
+    --bg: #000d1a;
+    --card-bg: rgba(0, 18, 36, 0.82);
+    --border: rgba(0,229,255,0.20);
+    --border-hover: rgba(0,229,255,0.50);
+    --text: #e0f7ff;
+    --text-dim: rgba(200,230,255,0.55);
+    --error: #ff5370;
+    --error-bg: rgba(255,83,112,0.10);
+}
+
+html, body {
+    height: 100%;
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Segoe UI', system-ui, sans-serif;
+    overflow: hidden;
+}
+
+/* ── Canvas fondo ── */
+#reactorBg {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+    pointer-events: none;
+}
+
+/* ── Wrapper centrado ── */
+.cedula-wrapper {
+    position: relative;
+    z-index: 1;
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 24px;
+}
+
+/* ── Card ── */
+.cedula-card {
+    width: 100%;
+    max-width: 420px;
+    background: var(--card-bg);
+    border: 1px solid var(--border);
+    border-radius: 18px;
+    padding: 44px 36px 40px;
+    backdrop-filter: blur(16px);
+    -webkit-backdrop-filter: blur(16px);
+    box-shadow:
+        0 0 0 1px rgba(0,229,255,0.06),
+        0 24px 64px rgba(0,0,0,0.60),
+        inset 0 1px 0 rgba(0,229,255,0.10);
+    animation: cardIn 0.55s cubic-bezier(0.22, 1, 0.36, 1) both;
+}
+
+@keyframes cardIn {
+    from { opacity: 0; transform: translateY(20px) scale(0.97); }
+    to   { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+/* ── Icono grande ── */
+.cedula-icon {
+    width: 64px;
+    height: 64px;
+    border-radius: 16px;
+    background: var(--cyan-dim);
+    border: 1px solid var(--border);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 auto 24px;
+    font-size: 28px;
+    color: var(--cyan);
+}
+
+/* ── Títulos ── */
+.cedula-titulo {
+    font-size: 22px;
+    font-weight: 600;
+    text-align: center;
+    color: var(--text);
+    margin-bottom: 8px;
+    letter-spacing: -0.3px;
+}
+
+.cedula-subtitulo {
+    font-size: 13.5px;
+    color: var(--text-dim);
+    text-align: center;
+    line-height: 1.6;
+    margin-bottom: 32px;
+}
+
+/* ── Formulario ── */
+.cedula-form {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}
+
+/* ── Grupo input ── */
+.input-grupo {
+    position: relative;
+    display: flex;
+    align-items: center;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: rgba(0,229,255,0.03);
+    transition: border-color 0.2s, box-shadow 0.2s;
+}
+
+.input-grupo:focus-within {
+    border-color: var(--border-hover);
+    box-shadow: 0 0 0 3px var(--cyan-glow);
+}
+
+.input-grupo.error-activo {
+    border-color: var(--error);
+    box-shadow: 0 0 0 3px rgba(255,83,112,0.10);
+}
+
+.input-icono {
+    font-size: 18px;
+    color: var(--text-dim);
+    padding: 0 12px;
+    flex-shrink: 0;
+    pointer-events: none;
+}
+
+.cedula-input {
+    flex: 1;
+    background: transparent;
+    border: none;
+    outline: none;
+    color: var(--text);
+    font-size: 20px;
+    font-weight: 500;
+    letter-spacing: 3px;
+    padding: 14px 0;
+    caret-color: var(--cyan);
+}
+
+.cedula-input::placeholder {
+    color: rgba(200,230,255,0.25);
+    letter-spacing: 2px;
+    font-weight: 400;
+}
+
+.input-contador {
+    font-size: 12px;
+    color: var(--text-dim);
+    padding: 0 14px;
+    flex-shrink: 0;
+    transition: color 0.2s;
+}
+
+.input-contador.completo {
+    color: var(--cyan);
+}
+
+/* ── Error msg ── */
+.error-msg {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    background: var(--error-bg);
+    border: 1px solid rgba(255,83,112,0.25);
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 13px;
+    color: var(--error);
+    animation: errorIn 0.25s ease;
+}
+
+@keyframes errorIn {
+    from { opacity: 0; transform: translateY(-4px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+/* ── Botón ── */
+.btn-consultar {
+    margin-top: 4px;
+    padding: 14px;
+    border: 1px solid var(--border);
+    border-radius: 10px;
+    background: var(--cyan-dim);
+    color: var(--cyan);
+    font-size: 15px;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+    position: relative;
+    overflow: hidden;
+}
+
+.btn-consultar:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+}
+
+.btn-consultar:not(:disabled):hover {
+    background: rgba(0,229,255,0.22);
+    border-color: var(--cyan);
+    box-shadow: 0 0 18px rgba(0,229,255,0.15);
+}
+
+.btn-consultar:not(:disabled):active {
+    transform: scale(0.98);
+}
+
+.btn-texto, .btn-loading {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+}
+
+/* ── Spin ── */
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+
+.spin {
+    display: inline-block;
+    animation: spin 0.8s linear infinite;
+}
+
+/* ── Oculto ── */
+.oculto {
+    display: none !important;
+}
+
+/* ── Pantalla de bienvenida ── */
+.bienvenida-overlay {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 13, 26, 0.0);
+    animation: overlayIn 0.4s ease forwards;
+}
+
+@keyframes overlayIn {
+    to { background: rgba(0, 13, 26, 0.85); }
+}
+
+.bienvenida-card {
+    text-align: center;
+    padding: 0 24px;
+    animation: bienvenidaIn 0.6s cubic-bezier(0.22, 1, 0.36, 1) both;
+    animation-delay: 0.2s;
+}
+
+@keyframes bienvenidaIn {
+    from { opacity: 0; transform: scale(0.88) translateY(16px); }
+    to   { opacity: 1; transform: scale(1) translateY(0); }
+}
+
+.bienvenida-icono {
+    font-size: 56px;
+    color: var(--cyan);
+    margin-bottom: 20px;
+    display: block;
+    animation: iconoPop 0.5s cubic-bezier(0.34, 1.56, 0.64, 1) both;
+    animation-delay: 0.4s;
+    opacity: 0;
+}
+
+@keyframes iconoPop {
+    from { opacity: 0; transform: scale(0.5); }
+    to   { opacity: 1; transform: scale(1); }
+}
+
+.bienvenida-saludo {
+    font-size: 15px;
+    color: var(--text-dim);
+    letter-spacing: 3px;
+    text-transform: uppercase;
+    margin-bottom: 10px;
+    animation: fadeUp 0.5s ease both;
+    animation-delay: 0.55s;
+    opacity: 0;
+}
+
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
+}
+
+.bienvenida-nombre {
+    font-size: 36px;
+    font-weight: 700;
+    color: var(--cyan);
+    letter-spacing: -0.5px;
+    line-height: 1.1;
+    margin-bottom: 16px;
+    animation: fadeUp 0.5s ease both;
+    animation-delay: 0.7s;
+    opacity: 0;
+    text-shadow: 0 0 32px rgba(0,229,255,0.35);
+}
+
+.bienvenida-sub {
+    font-size: 14px;
+    color: var(--text-dim);
+    animation: fadeUp 0.5s ease both;
+    animation-delay: 0.85s;
+    opacity: 0;
+}
+
+.bienvenida-barra {
+    width: 0%;
+    height: 2px;
+    background: var(--cyan);
+    border-radius: 2px;
+    margin: 28px auto 0;
+    max-width: 200px;
+    box-shadow: 0 0 10px rgba(0,229,255,0.5);
+    animation: barraProgreso 2.2s ease both;
+    animation-delay: 1.0s;
+}
+
+@keyframes barraProgreso {
+    from { width: 0%; opacity: 1; }
+    to   { width: 100%; opacity: 1; }
+}

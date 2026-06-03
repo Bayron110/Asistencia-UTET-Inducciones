@@ -1,10 +1,28 @@
-import { escucharCronogramas, calcularEstado } from '../../Firebase/cronograma.js';
+// ── mostrar-cronograma.js (actualizado) ─────────────────────
+// Ahora lee los parámetros de la URL:
+//   ?cedula=XXXXXXXXXX&cronogramaId=abc123
+// Si vienen parámetros → modo estudiante (muestra solo 1 cronograma).
+// Si no vienen         → modo admin (muestra todos, igual que antes).
+// ─────────────────────────────────────────────────────────────
+
+import { escucharCronogramas, calcularEstado, obtenerCronogramas } from '../../Firebase/cronograma.js';
+
+// ── Guard: sin parámetros válidos → redirige a cédula ────────
+const urlParams      = new URLSearchParams(window.location.search);
+const PARAM_CEDULA   = urlParams.get('cedula');
+const PARAM_CRONO_ID = urlParams.get('cronogramaId');
+
+if (!PARAM_CEDULA || !PARAM_CRONO_ID) {
+    window.location.replace('cedula-solicitud.html');
+}
+
+const MODO_ESTUDIANTE = true; // si llegó aquí, siempre es un estudiante autenticado
 
 // ── Estado ──────────────────────────────────────────────
 let todosLosCronogramas = [];
 let filtroActual = 'TODOS';
 
-// ── Reactor canvas ──────────────────────────────────────
+// ── Reactor canvas ──────────────────────────────────────────
 function initReactor() {
     const canvas = document.getElementById('reactorBg');
     if (!canvas) return;
@@ -293,13 +311,135 @@ function crearCard(c) {
     return card;
 }
 
+// ── Filtrado según modo ──────────────────────────────────
+function filtrarLista(lista) {
+    let resultado = lista;
+
+    // En modo estudiante filtramos por cronogramaId
+    if (MODO_ESTUDIANTE && PARAM_CRONO_ID) {
+        resultado = resultado.filter(c => c.id === PARAM_CRONO_ID);
+    }
+
+    // Filtro de estado (solo visible si no es modo estudiante)
+    if (!MODO_ESTUDIANTE && filtroActual !== 'TODOS') {
+        resultado = resultado.filter(c =>
+            calcularEstado(c.fechaInicio, c.fechaFin) === filtroActual
+        );
+    }
+
+    return resultado;
+}
+
+// ── Panel estudiante ─────────────────────────────────────
+function siguienteActividad(actividades) {
+    if (!actividades || actividades.length === 0) return null;
+    const hoy = new Date();
+    hoy.setHours(0, 0, 0, 0);
+    // Busca la primera que no ha terminado
+    return actividades.find(a => {
+        if (!a.fechaFin) return false;
+        const fin = new Date(a.fechaFin + 'T23:59:59');
+        return fin >= hoy;
+    }) ?? null;
+}
+
+function calcularPorcentaje(fechaInicio, fechaFin) {
+    if (!fechaInicio || !fechaFin) return 0;
+    const inicio = new Date(fechaInicio + 'T00:00:00').getTime();
+    const fin    = new Date(fechaFin    + 'T23:59:59').getTime();
+    const hoy    = Date.now();
+    if (hoy <= inicio) return 0;
+    if (hoy >= fin)    return 100;
+    return Math.round(((hoy - inicio) / (fin - inicio)) * 100);
+}
+
+async function renderPanelEstudiante(cronogramaId) {
+    const panel = document.getElementById('panelEstudiante');
+    if (!panel) return;
+
+    // Obtener datos del estudiante desde Firebase
+    const lista = await obtenerCronogramas();
+    const crono = lista.find(c => c.id === cronogramaId);
+    if (!crono) return;
+
+    const estudiante = crono.estudiantesVinculados?.[PARAM_CEDULA];
+    const nombre  = estudiante?.nombres ?? estudiante?.nombre ?? 'Estudiante';
+    const carrera = estudiante?.carrera ?? '';
+
+    const pct      = calcularPorcentaje(crono.fechaInicio, crono.fechaFin);
+    const proxAct  = siguienteActividad(crono.actividades ?? []);
+    const totalAct = crono.actividades?.length ?? 0;
+    const hechas   = (crono.actividades ?? []).filter(a => {
+        if (!a.fechaFin) return false;
+        const fin = new Date(a.fechaFin + 'T23:59:59');
+        return fin < new Date();
+    }).length;
+
+    const colorBarra = pct >= 80 ? '#22c55e' : pct >= 40 ? '#00e5ff' : '#f59e0b';
+
+    panel.innerHTML = `
+        <div class="ep-perfil">
+            <div class="ep-avatar">
+                <i class="ti ti-user-circle"></i>
+            </div>
+            <div class="ep-info">
+                <h2 class="ep-nombre">${nombre}</h2>
+                ${carrera ? `<span class="ep-carrera"><i class="ti ti-school"></i>${carrera}</span>` : ''}
+            </div>
+        </div>
+
+        <div class="ep-progress-bloque">
+            <div class="ep-progress-header">
+                <span class="ep-progress-label">
+                    <i class="ti ti-chart-line"></i>
+                    Progreso del cronograma
+                </span>
+                <span class="ep-progress-pct" style="color:${colorBarra}">${pct}%</span>
+            </div>
+            <div class="ep-barra-bg">
+                <div class="ep-barra-fill" style="width:${pct}%; background:${colorBarra}; box-shadow: 0 0 10px ${colorBarra}55"></div>
+            </div>
+            <div class="ep-progress-sub">
+                <span>${hechas} de ${totalAct} actividades completadas</span>
+                <span>${totalAct - hechas} restante${totalAct - hechas !== 1 ? 's' : ''}</span>
+            </div>
+        </div>
+
+        <div class="ep-notif-bloque">
+            <button class="ep-btn-notif" id="btnNotificaciones">
+                <i class="ti ti-bell"></i>
+                <span>Activar notificaciones</span>
+            </button>
+        </div>
+
+        ${proxAct ? `
+        <div class="ep-proxima">
+            <div class="ep-proxima-label">
+                <i class="ti ti-calendar-due"></i>
+                Siguiente actividad
+            </div>
+            <div class="ep-proxima-nombre">${proxAct.actividad}</div>
+            <div class="ep-proxima-fecha">
+                <i class="ti ti-clock"></i>
+                ${formatearFecha(proxAct.fechaInicio)} → ${formatearFecha(proxAct.fechaFin)}
+            </div>
+        </div>
+        ` : `
+        <div class="ep-proxima ep-proxima--done">
+            <i class="ti ti-circle-check"></i>
+            <span>Todas las actividades completadas</span>
+        </div>
+        `}
+    `;
+
+    panel.classList.remove('oculto');
+}
+
 // ── Render del grid ──────────────────────────────────────
 function renderGrid(lista) {
     const grid = document.getElementById('gridCronogramas');
     const vacia = document.getElementById('vistaVacia');
-    const filtrados = filtroActual === 'TODOS'
-        ? lista
-        : lista.filter(c => calcularEstado(c.fechaInicio, c.fechaFin) === filtroActual);
+    const filtrados = filtrarLista(lista);
 
     grid.innerHTML = '';
 
@@ -320,14 +460,12 @@ function actualizarContador(n, filtro) {
     const label = filtro === 'TODOS' ? 'cronograma' : filtro.toLowerCase();
     el.textContent = `${n} ${label}${n !== 1 ? 's' : ''} encontrado${n !== 1 ? 's' : ''}`;
 }
+
 function actividadFinalizada(fechaFin) {
     if (!fechaFin) return false;
-
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
-
     const fin = new Date(fechaFin + 'T23:59:59');
-
     return fin < hoy;
 }
 
@@ -367,11 +505,10 @@ function abrirModal(c) {
                     ${actividades.map((a, i) => `
                         <tr class="${actividadFinalizada(a.fechaFin) ? 'actividad-finalizada' : ''}">
                             <td class="td-num">
-    ${actividadFinalizada(a.fechaFin)
-                ? '<i class="ti ti-check"></i>'
-                : i + 1
-            }
-</td>
+                                ${actividadFinalizada(a.fechaFin)
+                                    ? '<i class="ti ti-check"></i>'
+                                    : i + 1}
+                            </td>
                             <td>${a.actividad}</td>
                             <td class="td-fecha">${formatearFecha(a.fechaInicio)}</td>
                             <td class="td-fecha">${formatearFecha(a.fechaFin)}</td>
@@ -391,8 +528,15 @@ function cerrarModal() {
     document.body.style.overflow = '';
 }
 
-// ── Filtros ───────────────────────────────────────────────
+// ── Filtros (solo en modo admin) ─────────────────────────
 function initFiltros() {
+    // Si es modo estudiante, ocultar los filtros
+    if (MODO_ESTUDIANTE) {
+        const filtrosEl = document.querySelector('.filtros');
+        if (filtrosEl) filtrosEl.style.display = 'none';
+        return;
+    }
+
     document.querySelectorAll('.filtro-btn').forEach(btn => {
         btn.addEventListener('click', () => {
             document.querySelectorAll('.filtro-btn')
@@ -409,6 +553,11 @@ document.addEventListener('DOMContentLoaded', () => {
     initReactor();
     iniciarReloj();
     initFiltros();
+
+    // Panel estudiante (solo en modo estudiante)
+    if (MODO_ESTUDIANTE && PARAM_CRONO_ID) {
+        renderPanelEstudiante(PARAM_CRONO_ID);
+    }
 
     document.getElementById('btnCerrarModal')
         .addEventListener('click', cerrarModal);
