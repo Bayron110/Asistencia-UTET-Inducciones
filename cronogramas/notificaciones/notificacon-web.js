@@ -1,17 +1,22 @@
 // ── notificacion-web.js ────────────────────────────────────
-// Bot de Telegram para notificaciones de actividades ITSOMET.
+// Bot de Telegram para notificaciones de actividades ITSQMET.
 // Usa solo Telegram Bot API + Firebase Realtime Database.
 // Compatible con plan Spark (sin Cloud Functions).
 // ──────────────────────────────────────────────────────────
 
+// DESPUÉS
 import { obtenerCronogramas } from '../../Firebase/cronograma.js';
-import { getDatabase, ref, update, get }
+import { getApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, update }
     from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 // ── Configuración ──────────────────────────────────────────
-const BOT_TOKEN = '8604941459:AAFe0QUbqyFHTJnFW4bbEtznHkRluW2ECIw'; // ← reemplazar tras revocar
-const BOT_USERNAME = 'itsometcronogramas_bot';
+const BOT_TOKEN    = '8604941459:AAFe0QUbqyFHTJnFW4bbEtznHkRluW2ECIw';
+export const BOT_USERNAME = 'itsometcronogramas_bot';
 const TELEGRAM_API = `https://api.telegram.org/bot${BOT_TOKEN}`;
+
+// ── Offset persistente (evita reprocesar updates viejos) ───
+let lastUpdateId = 0;
 
 // ── Enviar mensaje por Telegram ────────────────────────────
 export async function enviarMensajeTelegram(chatId, texto) {
@@ -26,6 +31,7 @@ export async function enviarMensajeTelegram(chatId, texto) {
             })
         });
         const data = await res.json();
+        if (!data.ok) console.error('Telegram sendMessage error:', data);
         return data.ok;
     } catch (err) {
         console.error('Error enviando mensaje Telegram:', err);
@@ -36,7 +42,9 @@ export async function enviarMensajeTelegram(chatId, texto) {
 // ── Guardar chatId en Firebase ─────────────────────────────
 export async function guardarChatId(cronogramaId, cedula, chatId) {
     try {
-        const db = getDatabase();
+        const app = getApp('cronogramas'); // ← misma app que usa cronograma.js
+        const db  = getDatabase(app);      // ← ahora sí encuentra Firebase
+
         await update(
             ref(db, `cronogramas/${cronogramaId}/estudiantesVinculados/${cedula}`),
             { telegramChatId: chatId, notificacionesActivas: true }
@@ -48,50 +56,92 @@ export async function guardarChatId(cronogramaId, cedula, chatId) {
     }
 }
 
-// ── Obtener updates del bot (polling) ─────────────────────
-// Se usa para recibir el /start del estudiante y capturar su chatId
-async function obtenerUpdates(offset = 0) {
+// ── Obtener updates del bot ────────────────────────────────
+async function obtenerUpdates() {
     try {
-        const res = await fetch(
-            `${TELEGRAM_API}/getUpdates?offset=${offset}&timeout=5&allowed_updates=["message"]`
-        );
+        const url = `${TELEGRAM_API}/getUpdates?offset=${lastUpdateId + 1}&timeout=3&allowed_updates=["message"]`;
+        const res  = await fetch(url);
         const data = await res.json();
-        return data.ok ? data.result : [];
-    } catch {
+
+        if (!data.ok) {
+            console.error('Telegram getUpdates error:', data);
+            return [];
+        }
+
+        return data.result ?? [];
+    } catch (err) {
+        console.error('Error obteniendo updates:', err);
         return [];
     }
 }
 
 // ── Procesar el /start del estudiante ─────────────────────
-// Cuando el estudiante abre el link t.me/bot?start=CEDULA_CRONOID
-// el bot recibe: /start CEDULA-CRONOGRAMAID
 export async function procesarRegistros() {
     const updates = await obtenerUpdates();
+
     for (const update of updates) {
+
+        // Actualizar offset para no reprocesar
+        if (update.update_id >= lastUpdateId) {
+            lastUpdateId = update.update_id;
+        }
+
         const msg = update.message;
         if (!msg || !msg.text) continue;
 
-        const texto = msg.text.trim();
+        const texto  = msg.text.trim();
         const chatId = String(msg.chat.id);
-        const nombre = msg.from.first_name ?? 'Estudiante';
+        const nombre = msg.from?.first_name ?? 'Estudiante';
 
-        if (texto.startsWith('/start ')) {
-            // Formato del payload: CEDULA-CRONOGRAMAID
-            const payload = texto.replace('/start ', '').trim();
-            const [cedula, cronogramaId] = payload.split('-');
+        console.log('📩 Mensaje recibido:', texto, '| chatId:', chatId);
 
-            if (cedula && cronogramaId) {
-                const ok = await guardarChatId(cronogramaId, cedula, chatId);
-                if (ok) {
-                    await enviarMensajeTelegram(chatId,
-                        `✅ <b>¡Listo, ${nombre}!</b>\n\n` +
-                        `Ya estás suscrito a las notificaciones de tu cronograma académico.\n\n` +
-                        `📅 Te avisaré cada vez que inicie una nueva actividad.\n` +
-                        `<i>ITSOMET — Sistema de Cronogramas</i>`
-                    );
-                }
-            }
-        }
+if (texto.startsWith('/start')) {
+    const payload = texto.replace('/start', '').trim();
+
+    console.log('📦 Payload recibido:', payload);
+
+    if (!payload) {
+        await enviarMensajeTelegram(chatId,
+            `👋 Hola <b>${nombre}</b>!\n\nPor favor accede al sistema para activar las notificaciones correctamente.`
+        );
+        continue;
+    }
+
+    // La cédula siempre son 10 dígitos, separar por eso
+    // Formato: 1752222404-OuAUik_fumdsJv5ZDY_
+    const match = payload.match(/^(\d{10})-(.+)$/);
+
+    if (!match) {
+        console.error('❌ Payload no tiene formato válido:', payload);
+        await enviarMensajeTelegram(chatId,
+            `❌ Link de activación inválido. Por favor accede al sistema nuevamente.`
+        );
+        continue;
+    }
+
+    const cedula       = match[1]; // exactamente 10 dígitos
+    const cronogramaId = match[2]; // todo lo que sigue
+
+    console.log('✅ Registrando:', { cedula, cronogramaId, chatId });
+
+    const ok = await guardarChatId(cronogramaId, cedula, chatId);
+
+    if (ok) {
+        await enviarMensajeTelegram(chatId,
+            `✅ <b>¡Listo, ${nombre}!</b>\n\n` +
+            `Ya estás suscrito a las notificaciones de tu cronograma académico.\n\n` +
+            `📅 Te avisaré cada vez que inicie una nueva actividad.\n\n` +
+            `<i>ITSQMET — Sistema de Cronogramas</i>`
+        );
+        console.log('✅ chatId guardado en Firebase para cédula:', cedula);
+    } else {
+        console.error('❌ Error guardando chatId en Firebase');
+        await enviarMensajeTelegram(chatId,
+            `❌ Hubo un error al activar las notificaciones.\n` +
+            `Por favor intenta de nuevo desde el sistema.`
+        );
+    }
+}
     }
 }
 
@@ -113,7 +163,7 @@ export async function revisarYNotificar() {
 
         // Notificar a cada estudiante con chatId registrado
         for (const [cedula, datos] of Object.entries(estudiantes)) {
-            const chatId = datos.telegramChatId;
+            const chatId  = datos.telegramChatId;
             const activas = datos.notificacionesActivas;
             if (!chatId || !activas) continue;
 
@@ -125,9 +175,9 @@ export async function revisarYNotificar() {
                     `Hola <b>${nombreEst}</b> 👋\n\n` +
                     `<b>${act.actividad}</b>\n\n` +
                     `📅 <b>Inicio:</b> ${formatFecha(act.fechaInicio)}\n` +
-                    `🏁 <b>Fin:</b> ${formatFecha(act.fechaFin)}\n\n` +
-                    `📋 Cronograma: <i>${crono.nombre}</i>\n` +
-                    `<i>ITSOMET — Sistema de Cronogramas</i>`;
+                    `🏁 <b>Fin:</b>    ${formatFecha(act.fechaFin)}\n\n` +
+                    `📋 Cronograma: <i>${crono.nombre}</i>\n\n` +
+                    `<i>ITSQMET — Sistema de Cronogramas</i>`;
 
                 await enviarMensajeTelegram(chatId, mensaje);
             }
@@ -145,8 +195,6 @@ function formatFecha(fecha) {
 }
 
 // ── Link de activación para el estudiante ─────────────────
-// Genera el link que abre el bot con la cédula y cronogramaId precargados
-// DESPUÉS — abre Telegram Web (funciona en PC y celular)
 export function generarLinkActivacion(cedula, cronogramaId) {
     const payload = `${cedula}-${cronogramaId}`;
     return `https://t.me/${BOT_USERNAME}?start=${payload}`;
