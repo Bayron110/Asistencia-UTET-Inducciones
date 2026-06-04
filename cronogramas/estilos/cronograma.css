@@ -754,3 +754,23 @@ body {
     justify-content: center;
     flex-shrink: 0;
 }
+/* Estado: notificaciones ya activas */
+.ep-btn-notif.notif-activa {
+    background: rgba(34, 197, 94, 0.15);
+    border-color: #22c55e;
+    color: #22c55e;
+    cursor: default;
+}
+
+.ep-btn-notif.notif-activa i {
+    color: #22c55e;
+}
+
+/* Ícono giratorio para el loader */
+@keyframes spin {
+    to { transform: rotate(360deg); }
+}
+.ti-spin {
+    animation: spin 1s linear infinite;
+    display: inline-block;
+}

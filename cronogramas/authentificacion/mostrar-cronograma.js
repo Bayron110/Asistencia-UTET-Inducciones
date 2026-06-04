@@ -6,10 +6,12 @@
 // ─────────────────────────────────────────────────────────────
 
 import { escucharCronogramas, calcularEstado, obtenerCronogramas } from '../../Firebase/cronograma.js';
+import { generarLinkActivacion, procesarRegistros, revisarYNotificar } from '../notificaciones/notificacon-web.js';
+const BOT_USERNAME = 'itsometcronogramas_bot';
 
 // ── Guard: sin parámetros válidos → redirige a cédula ────────
-const urlParams      = new URLSearchParams(window.location.search);
-const PARAM_CEDULA   = urlParams.get('cedula');
+const urlParams = new URLSearchParams(window.location.search);
+const PARAM_CEDULA = urlParams.get('cedula');
 const PARAM_CRONO_ID = urlParams.get('cronogramaId');
 
 if (!PARAM_CEDULA || !PARAM_CRONO_ID) {
@@ -346,10 +348,10 @@ function siguienteActividad(actividades) {
 function calcularPorcentaje(fechaInicio, fechaFin) {
     if (!fechaInicio || !fechaFin) return 0;
     const inicio = new Date(fechaInicio + 'T00:00:00').getTime();
-    const fin    = new Date(fechaFin    + 'T23:59:59').getTime();
-    const hoy    = Date.now();
+    const fin = new Date(fechaFin + 'T23:59:59').getTime();
+    const hoy = Date.now();
     if (hoy <= inicio) return 0;
-    if (hoy >= fin)    return 100;
+    if (hoy >= fin) return 100;
     return Math.round(((hoy - inicio) / (fin - inicio)) * 100);
 }
 
@@ -363,13 +365,13 @@ async function renderPanelEstudiante(cronogramaId) {
     if (!crono) return;
 
     const estudiante = crono.estudiantesVinculados?.[PARAM_CEDULA];
-    const nombre  = estudiante?.nombres ?? estudiante?.nombre ?? 'Estudiante';
+    const nombre = estudiante?.nombres ?? estudiante?.nombre ?? 'Estudiante';
     const carrera = estudiante?.carrera ?? '';
 
-    const pct      = calcularPorcentaje(crono.fechaInicio, crono.fechaFin);
-    const proxAct  = siguienteActividad(crono.actividades ?? []);
+    const pct = calcularPorcentaje(crono.fechaInicio, crono.fechaFin);
+    const proxAct = siguienteActividad(crono.actividades ?? []);
     const totalAct = crono.actividades?.length ?? 0;
-    const hechas   = (crono.actividades ?? []).filter(a => {
+    const hechas = (crono.actividades ?? []).filter(a => {
         if (!a.fechaFin) return false;
         const fin = new Date(a.fechaFin + 'T23:59:59');
         return fin < new Date();
@@ -433,6 +435,171 @@ async function renderPanelEstudiante(cronogramaId) {
     `;
 
     panel.classList.remove('oculto');
+
+    // Conectar botón de notificaciones
+    const btnNotif = document.getElementById('btnNotificaciones');
+    if (btnNotif) {
+        // Verificar si ya tiene notificaciones activas
+        const yaActivo = estudiante?.notificacionesActivas && estudiante?.telegramChatId;
+
+        if (yaActivo) {
+            btnNotif.classList.add('notif-activa');
+            btnNotif.innerHTML = `<i class="ti ti-bell-check"></i><span>Notificaciones activas</span>`;
+        }
+
+        btnNotif.addEventListener('click', () => {
+            if (yaActivo) return;
+
+            const esCelular = /Android|iPhone|iPad/i.test(navigator.userAgent);
+
+            if (esCelular) {
+                // Celular: usa el link nativo normal
+                const link = `https://t.me/${BOT_USERNAME}?start=${PARAM_CEDULA}-${cronogramaId}`;
+                window.open(link, '_blank', 'noopener,noreferrer');
+                mostrarToast('📱 Presiona START en Telegram para activar notificaciones');
+            } else {
+                // PC: mostrar modal con opciones
+                mostrarModalInstruccion(PARAM_CEDULA, cronogramaId);
+                iniciarPolling(cronogramaId);
+            }
+        });
+    }
+}
+
+// ── Toast informativo ──────────────────────────────────────
+function mostrarToast(msg) {
+    const existing = document.getElementById('toastNotif');
+    if (existing) existing.remove();
+
+    const toast = document.createElement('div');
+    toast.id = 'toastNotif';
+    toast.className = 'toast-notif';
+    toast.innerHTML = `<i class="ti ti-brand-telegram"></i><span>${msg}</span>`;
+    document.body.appendChild(toast);
+
+    setTimeout(() => toast.classList.add('toast-visible'), 10);
+    setTimeout(() => {
+        toast.classList.remove('toast-visible');
+        setTimeout(() => toast.remove(), 400);
+    }, 5000);
+}
+
+// ── Modal de instrucciones para PC ─────────────────────────
+function mostrarModalInstruccion(cedula, cronogramaId) {
+    const existing = document.getElementById('modalInstruccion');
+    if (existing) existing.remove();
+
+    const payload = `${cedula}-${cronogramaId}`;
+    const linkNativo = `https://t.me/${BOT_USERNAME}?start=${payload}`;
+    const linkTelegramWeb = `https://web.telegram.org/a/?tgaddr=tg%3A%2F%2Fresolve%3Fdomain%3D${BOT_USERNAME}%26start%3D${payload}`;
+
+    const modal = document.createElement('div');
+    modal.id = 'modalInstruccion';
+    modal.style.cssText = `
+        position: fixed; inset: 0; background: rgba(0,0,0,0.80);
+        display: flex; align-items: center; justify-content: center;
+        z-index: 9999;
+    `;
+    modal.innerHTML = `
+        <div style="
+            background: #0d1f2d; border: 1px solid #00e5ff44;
+            border-radius: 16px; padding: 32px; max-width: 440px; width: 90%;
+            text-align: center; color: #e0f7ff; font-family: Arial;
+            box-shadow: 0 0 40px #00e5ff22;
+        ">
+            <div style="font-size: 2.5rem; margin-bottom: 12px;">🔔</div>
+            <h3 style="color: #00e5ff; margin-bottom: 8px;">
+                Activar notificaciones
+            </h3>
+            <p style="color: #aad4e0; font-size: 0.9rem; margin-bottom: 24px;">
+                Elige cómo abrir Telegram:
+            </p>
+
+            <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
+
+                <a href="${linkNativo}" target="_blank" rel="noopener noreferrer"
+                    style="
+                        display: flex; align-items: center; gap: 12px;
+                        background: #00e5ff; color: #000d1a;
+                        padding: 14px 20px; border-radius: 10px;
+                        text-decoration: none; font-weight: bold; font-size: 0.95rem;
+                    ">
+                    <span style="font-size:1.4rem">💻</span>
+                    <span>Tengo Telegram instalado en el PC</span>
+                </a>
+
+                <a href="${linkTelegramWeb}" target="_blank" rel="noopener noreferrer"
+                    style="
+                        display: flex; align-items: center; gap: 12px;
+                        background: #0d2d3d; color: #00e5ff;
+                        border: 1px solid #00e5ff55;
+                        padding: 14px 20px; border-radius: 10px;
+                        text-decoration: none; font-weight: bold; font-size: 0.95rem;
+                    ">
+                    <span style="font-size:1.4rem">🌐</span>
+                    <span>Usar Telegram Web (sin instalar)</span>
+                </a>
+            </div>
+
+            <div style="
+                background: #0a1a2a; border-radius: 10px;
+                padding: 14px 16px; text-align: left;
+                font-size: 0.85rem; color: #7ab8cc;
+                border: 1px solid #00e5ff22; margin-bottom: 20px;
+            ">
+                <b style="color:#00e5ff">Si usas Telegram Web:</b><br>
+                1. Inicia sesión con tu número<br>
+                2. El bot se abrirá automáticamente<br>
+                3. Presiona <b style="color:#00e5ff">START</b>
+            </div>
+
+            <button id="btnCerrarInstruccion" style="
+                padding: 10px 28px; background: transparent;
+                color: #aad4e0; border: 1px solid #00e5ff44;
+                border-radius: 8px; cursor: pointer; font-size: 0.9rem;
+            ">Cerrar</button>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+    document.getElementById('btnCerrarInstruccion')
+        .addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', e => {
+        if (e.target === modal) modal.remove();
+    });
+}
+
+// ── Polling: espera que el estudiante presione Start ───────
+let pollingInterval = null;
+function iniciarPolling(cronogramaId) {
+    if (pollingInterval) return;
+    let intentos = 0;
+    pollingInterval = setInterval(async () => {
+        intentos++;
+        await procesarRegistros();
+
+        // Revisar si ya se guardó el chatId
+        const lista = await obtenerCronogramas();
+        const crono = lista.find(c => c.id === cronogramaId);
+        const est = crono?.estudiantesVinculados?.[PARAM_CEDULA];
+
+        if (est?.telegramChatId) {
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+            // Actualizar botón
+            const btn = document.getElementById('btnNotificaciones');
+            if (btn) {
+                btn.classList.add('notif-activa');
+                btn.innerHTML = `<i class="ti ti-bell-check"></i><span>Notificaciones activas</span>`;
+            }
+            mostrarToast('✅ ¡Notificaciones activadas correctamente!');
+        }
+
+        if (intentos >= 24) { // 2 minutos máximo
+            clearInterval(pollingInterval);
+            pollingInterval = null;
+        }
+    }, 5000); // cada 5 segundos
 }
 
 // ── Render del grid ──────────────────────────────────────
@@ -506,8 +673,8 @@ function abrirModal(c) {
                         <tr class="${actividadFinalizada(a.fechaFin) ? 'actividad-finalizada' : ''}">
                             <td class="td-num">
                                 ${actividadFinalizada(a.fechaFin)
-                                    ? '<i class="ti ti-check"></i>'
-                                    : i + 1}
+                ? '<i class="ti ti-check"></i>'
+                : i + 1}
                             </td>
                             <td>${a.actividad}</td>
                             <td class="td-fecha">${formatearFecha(a.fechaInicio)}</td>
@@ -571,4 +738,9 @@ document.addEventListener('DOMContentLoaded', () => {
         todosLosCronogramas = lista;
         renderGrid(lista);
     });
+
+    // Revisar actividades de hoy y notificar (se ejecuta al cargar la página)
+    if (MODO_ESTUDIANTE) {
+        revisarYNotificar();
+    }
 });
