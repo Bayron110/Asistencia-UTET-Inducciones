@@ -1,16 +1,14 @@
 // ── mostrar-cronograma.js ────────────────────────────────────
-// Lee los parámetros de la URL:
-//   ?cedula=XXXXXXXXXX&cronogramaId=abc123
-// Si vienen parámetros → modo estudiante (muestra solo 1 cronograma).
-// Si no vienen         → redirige a cédula-solicitud.html
+// ?cedula=XXXXXXXXXX&cronogramaId=abc123
+// Sin parámetros → redirige a cedula-solicitud.html
 // ─────────────────────────────────────────────────────────────
 
 import { escucharCronogramas, calcularEstado, obtenerCronogramas } from '../../Firebase/cronograma.js';
 import { generarLinkActivacion, procesarRegistros, revisarYNotificar } from '../notificaciones/notificacon-web.js';
+
 const BOT_USERNAME = 'itsometcronogramas_bot';
 
-// ── Guard: sin parámetros válidos → redirige a cédula ────────
-const urlParams    = new URLSearchParams(window.location.search);
+const urlParams       = new URLSearchParams(window.location.search);
 const PARAM_CEDULA    = urlParams.get('cedula');
 const PARAM_CRONO_ID  = urlParams.get('cronogramaId');
 
@@ -20,17 +18,15 @@ if (!PARAM_CEDULA || !PARAM_CRONO_ID) {
 
 const MODO_ESTUDIANTE = true;
 
-// ── Estado ───────────────────────────────────────────────────
 let todosLosCronogramas = [];
 let filtroActual = 'TODOS';
 
-// ── Reloj ────────────────────────────────────────────────────
+// ── Reloj ─────────────────────────────────────────────────────
 function iniciarReloj() {
     const el = document.getElementById('reloj');
     if (!el) return;
     const tick = () => {
-        const ahora = new Date();
-        el.textContent = ahora.toLocaleTimeString('es-EC', {
+        el.textContent = new Date().toLocaleTimeString('es-EC', {
             hour: '2-digit', minute: '2-digit', second: '2-digit'
         });
     };
@@ -38,17 +34,14 @@ function iniciarReloj() {
     setInterval(tick, 1000);
 }
 
-// ── Helpers de fecha ─────────────────────────────────────────
+// ── Helpers ───────────────────────────────────────────────────
 function formatearFecha(fecha) {
     if (!fecha) return '—';
     const d = new Date(fecha + (fecha.length === 10 ? 'T00:00:00' : ''));
     if (isNaN(d.getTime())) return fecha;
-    return d.toLocaleDateString('es-EC', {
-        day: '2-digit', month: 'short', year: 'numeric'
-    });
+    return d.toLocaleDateString('es-EC', { day: '2-digit', month: 'short', year: 'numeric' });
 }
 
-// ── Badge de estado ──────────────────────────────────────────
 function badgeEstado(estado) {
     const cfg = {
         VIGENTE:    { label: 'Vigente',    clase: 'vigente' },
@@ -59,7 +52,13 @@ function badgeEstado(estado) {
     return `<span class="badge ${clase}">${label}</span>`;
 }
 
-// ── Render de una card ───────────────────────────────────────
+function actividadFinalizada(fechaFin) {
+    if (!fechaFin) return false;
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
+    return new Date(fechaFin + 'T23:59:59') < hoy;
+}
+
+// ── Card ──────────────────────────────────────────────────────
 function crearCard(c) {
     const estado = calcularEstado(c.fechaInicio, c.fechaFin);
     const total  = c.actividades ? c.actividades.length : 0;
@@ -101,45 +100,38 @@ function crearCard(c) {
         </div>
     `;
 
-    card.querySelector('.btn-ver-detalle')
-        .addEventListener('click', () => abrirModal(c));
-
+    card.querySelector('.btn-ver-detalle').addEventListener('click', () => abrirModal(c));
     return card;
 }
 
-// ── Filtrado según modo ──────────────────────────────────────
+// ── Filtrado ──────────────────────────────────────────────────
 function filtrarLista(lista) {
     let resultado = lista;
-
     if (MODO_ESTUDIANTE && PARAM_CRONO_ID) {
         resultado = resultado.filter(c => c.id === PARAM_CRONO_ID);
     }
-
     if (!MODO_ESTUDIANTE && filtroActual !== 'TODOS') {
         resultado = resultado.filter(c =>
             calcularEstado(c.fechaInicio, c.fechaFin) === filtroActual
         );
     }
-
     return resultado;
 }
 
-// ── Panel estudiante ─────────────────────────────────────────
+// ── Panel estudiante ──────────────────────────────────────────
 function siguienteActividad(actividades) {
     if (!actividades || actividades.length === 0) return null;
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
     return actividades.find(a => {
         if (!a.fechaFin) return false;
-        const fin = new Date(a.fechaFin + 'T23:59:59');
-        return fin >= hoy;
+        return new Date(a.fechaFin + 'T23:59:59') >= hoy;
     }) ?? null;
 }
 
 function calcularPorcentaje(fechaInicio, fechaFin) {
     if (!fechaInicio || !fechaFin) return 0;
     const inicio = new Date(fechaInicio + 'T00:00:00').getTime();
-    const fin    = new Date(fechaFin + 'T23:59:59').getTime();
+    const fin    = new Date(fechaFin    + 'T23:59:59').getTime();
     const hoy    = Date.now();
     if (hoy <= inicio) return 0;
     if (hoy >= fin)    return 100;
@@ -150,8 +142,8 @@ async function renderPanelEstudiante(cronogramaId) {
     const panel = document.getElementById('panelEstudiante');
     if (!panel) return;
 
-    const lista  = await obtenerCronogramas();
-    const crono  = lista.find(c => c.id === cronogramaId);
+    const lista      = await obtenerCronogramas();
+    const crono      = lista.find(c => c.id === cronogramaId);
     if (!crono) return;
 
     const estudiante = crono.estudiantesVinculados?.[PARAM_CEDULA];
@@ -163,15 +155,12 @@ async function renderPanelEstudiante(cronogramaId) {
     const totalAct = crono.actividades?.length ?? 0;
     const hechas   = (crono.actividades ?? []).filter(a => {
         if (!a.fechaFin) return false;
-        const fin = new Date(a.fechaFin + 'T23:59:59');
-        return fin < new Date();
+        return new Date(a.fechaFin + 'T23:59:59') < new Date();
     }).length;
 
     panel.innerHTML = `
         <div class="ep-perfil">
-            <div class="ep-avatar">
-                <i class="ti ti-user-circle"></i>
-            </div>
+            <div class="ep-avatar"><i class="ti ti-user-circle"></i></div>
             <div class="ep-info">
                 <h2 class="ep-nombre">${nombre}</h2>
                 ${carrera ? `<span class="ep-carrera"><i class="ti ti-school"></i>${carrera}</span>` : ''}
@@ -224,9 +213,8 @@ async function renderPanelEstudiante(cronogramaId) {
 
     panel.classList.remove('oculto');
 
-    // Botón notificaciones
-    const btnNotif  = document.getElementById('btnNotificaciones');
-    const yaActivo  = estudiante?.notificacionesActivas && estudiante?.telegramChatId;
+    const btnNotif = document.getElementById('btnNotificaciones');
+    const yaActivo = estudiante?.notificacionesActivas && estudiante?.telegramChatId;
 
     if (btnNotif) {
         if (yaActivo) {
@@ -249,7 +237,7 @@ async function renderPanelEstudiante(cronogramaId) {
     }
 }
 
-// ── Toast ────────────────────────────────────────────────────
+// ── Toast ─────────────────────────────────────────────────────
 function mostrarToast(msg) {
     const existing = document.getElementById('toastNotif');
     if (existing) existing.remove();
@@ -267,7 +255,7 @@ function mostrarToast(msg) {
     }, 5000);
 }
 
-// ── Modal instrucciones PC ───────────────────────────────────
+// ── Modal instrucciones PC ────────────────────────────────────
 function mostrarModalInstruccion(cedula, cronogramaId) {
     const existing = document.getElementById('modalInstruccion');
     if (existing) existing.remove();
@@ -279,20 +267,25 @@ function mostrarModalInstruccion(cedula, cronogramaId) {
     const modal = document.createElement('div');
     modal.id = 'modalInstruccion';
     modal.style.cssText = `
-        position:fixed;inset:0;background:rgba(10,30,60,0.60);
+        position:fixed;inset:0;background:rgba(3,14,40,0.70);
         display:flex;align-items:center;justify-content:center;
         z-index:9999;padding:16px;
+        backdrop-filter:blur(4px);
     `;
     modal.innerHTML = `
         <div style="
             background:#fff;border:1px solid #b0cef0;
             border-radius:16px;padding:32px 28px;max-width:420px;width:100%;
             text-align:center;font-family:'DM Sans',sans-serif;
-            box-shadow:0 8px 32px rgba(10,61,124,0.18);
+            box-shadow:0 20px 60px rgba(0,0,0,0.40);
         ">
             <div style="font-size:2.4rem;margin-bottom:12px">🔔</div>
-            <h3 style="color:#0a3d7c;margin-bottom:8px;font-size:18px">Activar notificaciones</h3>
-            <p style="color:#64748b;font-size:13px;margin-bottom:24px">Elige cómo abrir Telegram:</p>
+            <h3 style="color:#0a3d7c;margin-bottom:8px;font-size:18px;font-weight:700">
+                Activar notificaciones
+            </h3>
+            <p style="color:#64748b;font-size:13px;margin-bottom:24px">
+                Elige cómo abrir Telegram:
+            </p>
 
             <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
                 <a href="${linkNativo}" target="_blank" rel="noopener noreferrer"
@@ -336,12 +329,11 @@ function mostrarModalInstruccion(cedula, cronogramaId) {
     `;
 
     document.body.appendChild(modal);
-    document.getElementById('btnCerrarInstruccion')
-        .addEventListener('click', () => modal.remove());
+    document.getElementById('btnCerrarInstruccion').addEventListener('click', () => modal.remove());
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 }
 
-// ── Polling ──────────────────────────────────────────────────
+// ── Polling ───────────────────────────────────────────────────
 let pollingInterval = null;
 function iniciarPolling(cronogramaId) {
     if (pollingInterval) return;
@@ -372,10 +364,10 @@ function iniciarPolling(cronogramaId) {
     }, 5000);
 }
 
-// ── Render del grid ──────────────────────────────────────────
+// ── Grid ──────────────────────────────────────────────────────
 function renderGrid(lista) {
-    const grid    = document.getElementById('gridCronogramas');
-    const vacia   = document.getElementById('vistaVacia');
+    const grid     = document.getElementById('gridCronogramas');
+    const vacia    = document.getElementById('vistaVacia');
     const filtrados = filtrarLista(lista);
 
     grid.innerHTML = '';
@@ -398,14 +390,7 @@ function actualizarContador(n, filtro) {
     el.textContent = `${n} ${label}${n !== 1 ? 's' : ''} encontrado${n !== 1 ? 's' : ''}`;
 }
 
-function actividadFinalizada(fechaFin) {
-    if (!fechaFin) return false;
-    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
-    const fin = new Date(fechaFin + 'T23:59:59');
-    return fin < hoy;
-}
-
-// ── Modal detalle ────────────────────────────────────────────
+// ── Modal detalle ─────────────────────────────────────────────
 function abrirModal(c) {
     const estado = calcularEstado(c.fechaInicio, c.fechaFin);
 
@@ -414,11 +399,11 @@ function abrirModal(c) {
     document.getElementById('modalHeader').style.borderColor = c.colorBorde ?? '#0d47a1';
     document.getElementById('modalHeader').style.fontFamily  = c.fuente ?? 'DM Sans, sans-serif';
 
-    document.getElementById('modalBadge').innerHTML          = badgeEstado(estado);
-    document.getElementById('modalNombre').textContent       = c.nombre ?? '—';
-    document.getElementById('modalPeriodo').textContent      = c.periodo ?? '—';
-    document.getElementById('modalFechaInicio').textContent  = formatearFecha(c.fechaInicio);
-    document.getElementById('modalFechaFin').textContent     = formatearFecha(c.fechaFin);
+    document.getElementById('modalBadge').innerHTML              = badgeEstado(estado);
+    document.getElementById('modalNombre').textContent           = c.nombre ?? '—';
+    document.getElementById('modalPeriodo').textContent          = c.periodo ?? '—';
+    document.getElementById('modalFechaInicio').textContent      = formatearFecha(c.fechaInicio);
+    document.getElementById('modalFechaFin').textContent         = formatearFecha(c.fechaFin);
     document.getElementById('modalFechaPublicacion').textContent = formatearFecha(c.fechaPublicacion);
 
     const actividades = c.actividades ?? [];
@@ -464,7 +449,7 @@ function cerrarModal() {
     document.body.style.overflow = '';
 }
 
-// ── Filtros (solo en modo admin) ─────────────────────────────
+// ── Filtros (solo modo admin) ─────────────────────────────────
 function initFiltros() {
     if (MODO_ESTUDIANTE) {
         const filtrosEl = document.querySelector('.filtros');
@@ -474,8 +459,7 @@ function initFiltros() {
 
     document.querySelectorAll('.filtro-btn').forEach(btn => {
         btn.addEventListener('click', () => {
-            document.querySelectorAll('.filtro-btn')
-                .forEach(b => b.classList.remove('active'));
+            document.querySelectorAll('.filtro-btn').forEach(b => b.classList.remove('active'));
             btn.classList.add('active');
             filtroActual = btn.dataset.estado;
             renderGrid(todosLosCronogramas);
@@ -492,13 +476,11 @@ document.addEventListener('DOMContentLoaded', () => {
         renderPanelEstudiante(PARAM_CRONO_ID);
     }
 
-    document.getElementById('btnCerrarModal')
-        .addEventListener('click', cerrarModal);
+    document.getElementById('btnCerrarModal').addEventListener('click', cerrarModal);
 
-    document.getElementById('modalOverlay')
-        .addEventListener('click', e => {
-            if (e.target === e.currentTarget) cerrarModal();
-        });
+    document.getElementById('modalOverlay').addEventListener('click', e => {
+        if (e.target === e.currentTarget) cerrarModal();
+    });
 
     escucharCronogramas(lista => {
         todosLosCronogramas = lista;
