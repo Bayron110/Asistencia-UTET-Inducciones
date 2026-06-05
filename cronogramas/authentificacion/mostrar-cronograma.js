@@ -1,8 +1,8 @@
-// ── mostrar-cronograma.js (actualizado) ─────────────────────
-// Ahora lee los parámetros de la URL:
+// ── mostrar-cronograma.js ────────────────────────────────────
+// Lee los parámetros de la URL:
 //   ?cedula=XXXXXXXXXX&cronogramaId=abc123
 // Si vienen parámetros → modo estudiante (muestra solo 1 cronograma).
-// Si no vienen         → modo admin (muestra todos, igual que antes).
+// Si no vienen         → redirige a cédula-solicitud.html
 // ─────────────────────────────────────────────────────────────
 
 import { escucharCronogramas, calcularEstado, obtenerCronogramas } from '../../Firebase/cronograma.js';
@@ -10,227 +10,21 @@ import { generarLinkActivacion, procesarRegistros, revisarYNotificar } from '../
 const BOT_USERNAME = 'itsometcronogramas_bot';
 
 // ── Guard: sin parámetros válidos → redirige a cédula ────────
-const urlParams = new URLSearchParams(window.location.search);
-const PARAM_CEDULA = urlParams.get('cedula');
-const PARAM_CRONO_ID = urlParams.get('cronogramaId');
+const urlParams    = new URLSearchParams(window.location.search);
+const PARAM_CEDULA    = urlParams.get('cedula');
+const PARAM_CRONO_ID  = urlParams.get('cronogramaId');
 
 if (!PARAM_CEDULA || !PARAM_CRONO_ID) {
     window.location.replace('cedula-solicitud.html');
 }
 
-const MODO_ESTUDIANTE = true; // si llegó aquí, siempre es un estudiante autenticado
+const MODO_ESTUDIANTE = true;
 
-// ── Estado ──────────────────────────────────────────────
+// ── Estado ───────────────────────────────────────────────────
 let todosLosCronogramas = [];
 let filtroActual = 'TODOS';
 
-// ── Reactor canvas ──────────────────────────────────────────
-function initReactor() {
-    const canvas = document.getElementById('reactorBg');
-    if (!canvas) return;
-    const ctx = canvas.getContext('2d');
-
-    const resize = () => {
-        canvas.width = window.innerWidth;
-        canvas.height = window.innerHeight;
-    };
-    resize();
-    window.addEventListener('resize', resize);
-
-    const ox = () => canvas.width * 0.5;
-    const oy = () => canvas.height * 0.5;
-
-    const rings = [
-        { r: 240, speed: 0.0015, dash: [1, 5], dir: 1, alpha: 0.20, width: 0.8 },
-        { r: 220, speed: 0.004, dash: [40, 12], dir: -1, alpha: 0.55, width: 2.5 },
-        { r: 220, speed: 0.004, dash: [20, 32], dir: -1, alpha: 0.30, width: 1.0 },
-        { r: 195, speed: 0.002, dash: [2, 6], dir: 1, alpha: 0.25, width: 0.8 },
-        { r: 175, speed: 0.007, dash: [30, 15], dir: 1, alpha: 0.60, width: 2.0 },
-        { r: 175, speed: 0.007, dash: [10, 35], dir: 1, alpha: 0.25, width: 1.0 },
-        { r: 155, speed: 0.0025, dash: [1000, 0], dir: -1, alpha: 0.18, width: 1.0 },
-        { r: 135, speed: 0.014, dash: [25, 20], dir: -1, alpha: 0.65, width: 2.0 },
-        { r: 135, speed: 0.014, dash: [8, 37], dir: -1, alpha: 0.30, width: 1.0 },
-        { r: 112, speed: 0.005, dash: [3, 5], dir: 1, alpha: 0.30, width: 1.0 },
-        { r: 90, speed: 0.020, dash: [18, 18], dir: 1, alpha: 0.70, width: 2.5 },
-        { r: 90, speed: 0.020, dash: [6, 30], dir: 1, alpha: 0.35, width: 1.0 },
-        { r: 68, speed: 0.030, dash: [12, 8], dir: -1, alpha: 0.55, width: 1.5 },
-        { r: 68, speed: 0.030, dash: [3, 17], dir: -1, alpha: 0.25, width: 1.0 },
-        { r: 45, speed: 0.040, dash: [8, 4], dir: 1, alpha: 0.80, width: 2.5 },
-        { r: 45, speed: 0.040, dash: [2, 10], dir: 1, alpha: 0.40, width: 1.0 },
-    ];
-    const angles = rings.map(() => Math.random() * Math.PI * 2);
-
-    const ticksOuter = Array.from({ length: 96 }, (_, i) => ({
-        angle: (i / 96) * Math.PI * 2,
-        len: i % 8 === 0 ? 16 : i % 4 === 0 ? 10 : i % 2 === 0 ? 6 : 3,
-        r: 248,
-        alpha: i % 8 === 0 ? 0.80 : i % 4 === 0 ? 0.50 : 0.20,
-        width: i % 8 === 0 ? 1.5 : 0.8
-    }));
-
-    const ticksMid = Array.from({ length: 60 }, (_, i) => ({
-        angle: (i / 60) * Math.PI * 2,
-        len: i % 5 === 0 ? 10 : 5,
-        r: 200,
-        alpha: i % 5 === 0 ? 0.55 : 0.20,
-        width: i % 5 === 0 ? 1.2 : 0.7
-    }));
-
-    const ticksInner = Array.from({ length: 36 }, (_, i) => ({
-        angle: (i / 36) * Math.PI * 2,
-        len: i % 3 === 0 ? 8 : 4,
-        r: 118,
-        alpha: i % 3 === 0 ? 0.60 : 0.20,
-        width: 0.8
-    }));
-
-    const hudLines = [
-        { side: 'left', yOff: -80, len: 200, alpha: 0.30, dash: [20, 6, 4, 6] },
-        { side: 'left', yOff: -50, len: 280, alpha: 0.20, dash: [8, 8] },
-        { side: 'left', yOff: 50, len: 240, alpha: 0.25, dash: [15, 6] },
-        { side: 'left', yOff: 80, len: 180, alpha: 0.18, dash: [5, 10] },
-        { side: 'right', yOff: -70, len: 220, alpha: 0.30, dash: [20, 6, 4, 6] },
-        { side: 'right', yOff: -40, len: 300, alpha: 0.20, dash: [8, 8] },
-        { side: 'right', yOff: 60, len: 250, alpha: 0.25, dash: [15, 6] },
-        { side: 'right', yOff: 90, len: 170, alpha: 0.18, dash: [5, 10] },
-    ];
-
-    const particles = Array.from({ length: 80 }, () => ({
-        x: Math.random() * window.innerWidth,
-        y: Math.random() * window.innerHeight,
-        r: Math.random() * 1.8 + 0.3,
-        vx: (Math.random() - 0.5) * 0.30,
-        vy: -(Math.random() * 0.45 + 0.06),
-        alpha: Math.random() * 0.50 + 0.10,
-        pulse: Math.random() * Math.PI * 2,
-        green: Math.random() < 0.15
-    }));
-
-    const scanDots = Array.from({ length: 50 }, () => ({
-        x: Math.random() * window.innerWidth,
-        y: Math.random() * window.innerHeight,
-        r: Math.random() * 2.2 + 0.5,
-        alpha: Math.random() * 0.28 + 0.05,
-        green: Math.random() < 0.20,
-        pulse: Math.random() * Math.PI * 2
-    }));
-
-    let corePhase = 0;
-
-    const draw = () => {
-        const w = canvas.width, h = canvas.height;
-        const cx = ox(), cy = oy();
-        ctx.clearRect(0, 0, w, h);
-
-        ctx.fillStyle = '#000d1a';
-        ctx.fillRect(0, 0, w, h);
-
-        const bgG = ctx.createRadialGradient(cx, cy, 0, cx, cy, 420);
-        bgG.addColorStop(0, 'rgba(0,80,120,0.22)');
-        bgG.addColorStop(0.4, 'rgba(0,40,70,0.14)');
-        bgG.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = bgG;
-        ctx.fillRect(0, 0, w, h);
-
-        scanDots.forEach(d => {
-            d.pulse += 0.022;
-            const a = d.alpha * (0.55 + 0.45 * Math.sin(d.pulse));
-            ctx.beginPath();
-            ctx.arc(d.x, d.y, d.r, 0, Math.PI * 2);
-            ctx.fillStyle = d.green ? `rgba(105,255,71,${a})` : `rgba(0,229,255,${a})`;
-            ctx.fill();
-        });
-
-        hudLines.forEach(l => {
-            const startX = l.side === 'left' ? cx - 250 - l.len : cx + 250;
-            const endX = l.side === 'left' ? cx - 250 : cx + 250 + l.len;
-            ctx.beginPath();
-            ctx.moveTo(startX, cy + l.yOff);
-            ctx.lineTo(endX, cy + l.yOff);
-            ctx.strokeStyle = `rgba(0,229,255,${l.alpha})`;
-            ctx.lineWidth = 0.8;
-            ctx.setLineDash(l.dash);
-            ctx.stroke();
-            ctx.setLineDash([]);
-            const tx = l.side === 'left' ? startX : endX;
-            ctx.fillStyle = `rgba(0,229,255,${l.alpha * 1.5})`;
-            ctx.fillRect(tx - 2, cy + l.yOff - 2, 4, 4);
-        });
-
-        [ticksOuter, ticksMid, ticksInner].forEach(group => {
-            group.forEach(tk => {
-                const x1 = cx + Math.cos(tk.angle) * tk.r;
-                const y1 = cy + Math.sin(tk.angle) * tk.r;
-                const x2 = cx + Math.cos(tk.angle) * (tk.r + tk.len);
-                const y2 = cy + Math.sin(tk.angle) * (tk.r + tk.len);
-                ctx.beginPath();
-                ctx.moveTo(x1, y1); ctx.lineTo(x2, y2);
-                ctx.strokeStyle = `rgba(0,229,255,${tk.alpha})`;
-                ctx.lineWidth = tk.width;
-                ctx.stroke();
-            });
-        });
-
-        rings.forEach((ring, i) => {
-            angles[i] += ring.speed * ring.dir;
-            ctx.save();
-            ctx.translate(cx, cy);
-            ctx.rotate(angles[i]);
-            ctx.beginPath();
-            ctx.arc(0, 0, ring.r, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(0,229,255,${ring.alpha})`;
-            ctx.lineWidth = ring.width;
-            ctx.setLineDash(ring.dash);
-            ctx.stroke();
-            ctx.restore();
-        });
-        ctx.setLineDash([]);
-
-        corePhase += 0.025;
-        const corePulse = 0.75 + 0.25 * Math.sin(corePhase);
-        const coreGlow = 0.85 + 0.15 * Math.sin(corePhase * 1.3);
-
-        const halo1 = ctx.createRadialGradient(cx, cy, 0, cx, cy, 55 * corePulse);
-        halo1.addColorStop(0, `rgba(0,229,255,${0.18 * coreGlow})`);
-        halo1.addColorStop(0.5, `rgba(0,150,200,${0.10 * coreGlow})`);
-        halo1.addColorStop(1, 'rgba(0,229,255,0)');
-        ctx.beginPath(); ctx.arc(cx, cy, 55 * corePulse, 0, Math.PI * 2);
-        ctx.fillStyle = halo1; ctx.fill();
-
-        const sphere = ctx.createRadialGradient(cx - 4, cy - 4, 2, cx, cy, 22);
-        sphere.addColorStop(0, `rgba(180,240,255,${0.95 * coreGlow})`);
-        sphere.addColorStop(0.3, `rgba(0,229,255,${0.85 * coreGlow})`);
-        sphere.addColorStop(0.7, `rgba(0,100,180,${0.70 * coreGlow})`);
-        sphere.addColorStop(1, `rgba(0,30,60,${0.90 * coreGlow})`);
-        ctx.beginPath(); ctx.arc(cx, cy, 22, 0, Math.PI * 2);
-        ctx.fillStyle = sphere; ctx.fill();
-
-        const dot = ctx.createRadialGradient(cx, cy, 0, cx, cy, 6);
-        dot.addColorStop(0, '#ffffff');
-        dot.addColorStop(0.4, `rgba(200,245,255,${coreGlow})`);
-        dot.addColorStop(1, 'rgba(0,229,255,0)');
-        ctx.beginPath(); ctx.arc(cx, cy, 6, 0, Math.PI * 2);
-        ctx.fillStyle = dot; ctx.fill();
-
-        particles.forEach(p => {
-            p.pulse += 0.020;
-            const a = p.alpha * (0.65 + 0.35 * Math.sin(p.pulse));
-            ctx.beginPath();
-            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-            ctx.fillStyle = p.green ? `rgba(105,255,71,${a})` : `rgba(0,229,255,${a})`;
-            ctx.fill();
-            p.x += p.vx; p.y += p.vy;
-            if (p.y < -5) { p.y = h + 5; p.x = Math.random() * w; }
-            if (p.x < -5) p.x = w + 5;
-            if (p.x > w + 5) p.x = -5;
-        });
-
-        requestAnimationFrame(draw);
-    };
-    draw();
-}
-
-// ── Reloj ────────────────────────────────────────────────
+// ── Reloj ────────────────────────────────────────────────────
 function iniciarReloj() {
     const el = document.getElementById('reloj');
     if (!el) return;
@@ -244,7 +38,7 @@ function iniciarReloj() {
     setInterval(tick, 1000);
 }
 
-// ── Helpers de fecha ─────────────────────────────────────
+// ── Helpers de fecha ─────────────────────────────────────────
 function formatearFecha(fecha) {
     if (!fecha) return '—';
     const d = new Date(fecha + (fecha.length === 10 ? 'T00:00:00' : ''));
@@ -254,10 +48,10 @@ function formatearFecha(fecha) {
     });
 }
 
-// ── Badge de estado ──────────────────────────────────────
+// ── Badge de estado ──────────────────────────────────────────
 function badgeEstado(estado) {
     const cfg = {
-        VIGENTE: { label: 'Vigente', clase: 'vigente' },
+        VIGENTE:    { label: 'Vigente',    clase: 'vigente' },
         PROGRAMADO: { label: 'Programado', clase: 'programado' },
         FINALIZADO: { label: 'Finalizado', clase: 'finalizado' },
     };
@@ -265,21 +59,21 @@ function badgeEstado(estado) {
     return `<span class="badge ${clase}">${label}</span>`;
 }
 
-// ── Render de una card ───────────────────────────────────
+// ── Render de una card ───────────────────────────────────────
 function crearCard(c) {
     const estado = calcularEstado(c.fechaInicio, c.fechaFin);
-    const total = c.actividades ? c.actividades.length : 0;
+    const total  = c.actividades ? c.actividades.length : 0;
 
     const card = document.createElement('div');
-    card.className = 'crono-card';
+    card.className  = 'crono-card';
     card.dataset.id = c.id;
 
     card.innerHTML = `
         <div class="crono-card-top"
-            style="background:${c.colorFondo ?? '#1976d2'};
+            style="background:${c.colorFondo ?? '#1565c0'};
                    color:${c.colorTexto ?? '#ffffff'};
                    border-color:${c.colorBorde ?? '#0d47a1'};
-                   font-family:${c.fuente ?? 'Arial'}">
+                   font-family:${c.fuente ?? 'DM Sans, sans-serif'}">
             <div class="crono-card-estado">${badgeEstado(estado)}</div>
             <h3 class="crono-card-nombre">${c.nombre ?? 'Sin nombre'}</h3>
             <p class="crono-card-periodo">${c.periodo ?? ''}</p>
@@ -313,16 +107,14 @@ function crearCard(c) {
     return card;
 }
 
-// ── Filtrado según modo ──────────────────────────────────
+// ── Filtrado según modo ──────────────────────────────────────
 function filtrarLista(lista) {
     let resultado = lista;
 
-    // En modo estudiante filtramos por cronogramaId
     if (MODO_ESTUDIANTE && PARAM_CRONO_ID) {
         resultado = resultado.filter(c => c.id === PARAM_CRONO_ID);
     }
 
-    // Filtro de estado (solo visible si no es modo estudiante)
     if (!MODO_ESTUDIANTE && filtroActual !== 'TODOS') {
         resultado = resultado.filter(c =>
             calcularEstado(c.fechaInicio, c.fechaFin) === filtroActual
@@ -332,12 +124,11 @@ function filtrarLista(lista) {
     return resultado;
 }
 
-// ── Panel estudiante ─────────────────────────────────────
+// ── Panel estudiante ─────────────────────────────────────────
 function siguienteActividad(actividades) {
     if (!actividades || actividades.length === 0) return null;
     const hoy = new Date();
     hoy.setHours(0, 0, 0, 0);
-    // Busca la primera que no ha terminado
     return actividades.find(a => {
         if (!a.fechaFin) return false;
         const fin = new Date(a.fechaFin + 'T23:59:59');
@@ -348,10 +139,10 @@ function siguienteActividad(actividades) {
 function calcularPorcentaje(fechaInicio, fechaFin) {
     if (!fechaInicio || !fechaFin) return 0;
     const inicio = new Date(fechaInicio + 'T00:00:00').getTime();
-    const fin = new Date(fechaFin + 'T23:59:59').getTime();
-    const hoy = Date.now();
+    const fin    = new Date(fechaFin + 'T23:59:59').getTime();
+    const hoy    = Date.now();
     if (hoy <= inicio) return 0;
-    if (hoy >= fin) return 100;
+    if (hoy >= fin)    return 100;
     return Math.round(((hoy - inicio) / (fin - inicio)) * 100);
 }
 
@@ -359,25 +150,22 @@ async function renderPanelEstudiante(cronogramaId) {
     const panel = document.getElementById('panelEstudiante');
     if (!panel) return;
 
-    // Obtener datos del estudiante desde Firebase
-    const lista = await obtenerCronogramas();
-    const crono = lista.find(c => c.id === cronogramaId);
+    const lista  = await obtenerCronogramas();
+    const crono  = lista.find(c => c.id === cronogramaId);
     if (!crono) return;
 
     const estudiante = crono.estudiantesVinculados?.[PARAM_CEDULA];
-    const nombre = estudiante?.nombres ?? estudiante?.nombre ?? 'Estudiante';
-    const carrera = estudiante?.carrera ?? '';
+    const nombre     = estudiante?.nombres ?? estudiante?.nombre ?? 'Estudiante';
+    const carrera    = estudiante?.carrera ?? '';
 
-    const pct = calcularPorcentaje(crono.fechaInicio, crono.fechaFin);
-    const proxAct = siguienteActividad(crono.actividades ?? []);
+    const pct      = calcularPorcentaje(crono.fechaInicio, crono.fechaFin);
+    const proxAct  = siguienteActividad(crono.actividades ?? []);
     const totalAct = crono.actividades?.length ?? 0;
-    const hechas = (crono.actividades ?? []).filter(a => {
+    const hechas   = (crono.actividades ?? []).filter(a => {
         if (!a.fechaFin) return false;
         const fin = new Date(a.fechaFin + 'T23:59:59');
         return fin < new Date();
     }).length;
-
-    const colorBarra = pct >= 80 ? '#22c55e' : pct >= 40 ? '#00e5ff' : '#f59e0b';
 
     panel.innerHTML = `
         <div class="ep-perfil">
@@ -394,15 +182,15 @@ async function renderPanelEstudiante(cronogramaId) {
             <div class="ep-progress-header">
                 <span class="ep-progress-label">
                     <i class="ti ti-chart-line"></i>
-                    Progreso del cronograma
+                    Progreso
                 </span>
-                <span class="ep-progress-pct" style="color:${colorBarra}">${pct}%</span>
+                <span class="ep-progress-pct">${pct}%</span>
             </div>
             <div class="ep-barra-bg">
-                <div class="ep-barra-fill" style="width:${pct}%; background:${colorBarra}; box-shadow: 0 0 10px ${colorBarra}55"></div>
+                <div class="ep-barra-fill" style="width:${pct}%"></div>
             </div>
             <div class="ep-progress-sub">
-                <span>${hechas} de ${totalAct} actividades completadas</span>
+                <span>${hechas} de ${totalAct} completadas</span>
                 <span>${totalAct - hechas} restante${totalAct - hechas !== 1 ? 's' : ''}</span>
             </div>
         </div>
@@ -436,12 +224,11 @@ async function renderPanelEstudiante(cronogramaId) {
 
     panel.classList.remove('oculto');
 
-    // Conectar botón de notificaciones
-    const btnNotif = document.getElementById('btnNotificaciones');
-    if (btnNotif) {
-        // Verificar si ya tiene notificaciones activas
-        const yaActivo = estudiante?.notificacionesActivas && estudiante?.telegramChatId;
+    // Botón notificaciones
+    const btnNotif  = document.getElementById('btnNotificaciones');
+    const yaActivo  = estudiante?.notificacionesActivas && estudiante?.telegramChatId;
 
+    if (btnNotif) {
         if (yaActivo) {
             btnNotif.classList.add('notif-activa');
             btnNotif.innerHTML = `<i class="ti ti-bell-check"></i><span>Notificaciones activas</span>`;
@@ -449,16 +236,12 @@ async function renderPanelEstudiante(cronogramaId) {
 
         btnNotif.addEventListener('click', () => {
             if (yaActivo) return;
-
             const esCelular = /Android|iPhone|iPad/i.test(navigator.userAgent);
-
             if (esCelular) {
-                // Celular: usa el link nativo normal
                 const link = `https://t.me/${BOT_USERNAME}?start=${PARAM_CEDULA}-${cronogramaId}`;
                 window.open(link, '_blank', 'noopener,noreferrer');
                 mostrarToast('📱 Presiona START en Telegram para activar notificaciones');
             } else {
-                // PC: mostrar modal con opciones
                 mostrarModalInstruccion(PARAM_CEDULA, cronogramaId);
                 iniciarPolling(cronogramaId);
             }
@@ -466,13 +249,13 @@ async function renderPanelEstudiante(cronogramaId) {
     }
 }
 
-// ── Toast informativo ──────────────────────────────────────
+// ── Toast ────────────────────────────────────────────────────
 function mostrarToast(msg) {
     const existing = document.getElementById('toastNotif');
     if (existing) existing.remove();
 
     const toast = document.createElement('div');
-    toast.id = 'toastNotif';
+    toast.id        = 'toastNotif';
     toast.className = 'toast-notif';
     toast.innerHTML = `<i class="ti ti-brand-telegram"></i><span>${msg}</span>`;
     document.body.appendChild(toast);
@@ -484,79 +267,70 @@ function mostrarToast(msg) {
     }, 5000);
 }
 
-// ── Modal de instrucciones para PC ─────────────────────────
+// ── Modal instrucciones PC ───────────────────────────────────
 function mostrarModalInstruccion(cedula, cronogramaId) {
     const existing = document.getElementById('modalInstruccion');
     if (existing) existing.remove();
 
-    const payload = `${cedula}-${cronogramaId}`;
-    const linkNativo = `https://t.me/${BOT_USERNAME}?start=${payload}`;
+    const payload         = `${cedula}-${cronogramaId}`;
+    const linkNativo      = `https://t.me/${BOT_USERNAME}?start=${payload}`;
     const linkTelegramWeb = `https://web.telegram.org/a/?tgaddr=tg%3A%2F%2Fresolve%3Fdomain%3D${BOT_USERNAME}%26start%3D${payload}`;
 
     const modal = document.createElement('div');
     modal.id = 'modalInstruccion';
     modal.style.cssText = `
-        position: fixed; inset: 0; background: rgba(0,0,0,0.80);
-        display: flex; align-items: center; justify-content: center;
-        z-index: 9999;
+        position:fixed;inset:0;background:rgba(10,30,60,0.60);
+        display:flex;align-items:center;justify-content:center;
+        z-index:9999;padding:16px;
     `;
     modal.innerHTML = `
         <div style="
-            background: #0d1f2d; border: 1px solid #00e5ff44;
-            border-radius: 16px; padding: 32px; max-width: 440px; width: 90%;
-            text-align: center; color: #e0f7ff; font-family: Arial;
-            box-shadow: 0 0 40px #00e5ff22;
+            background:#fff;border:1px solid #b0cef0;
+            border-radius:16px;padding:32px 28px;max-width:420px;width:100%;
+            text-align:center;font-family:'DM Sans',sans-serif;
+            box-shadow:0 8px 32px rgba(10,61,124,0.18);
         ">
-            <div style="font-size: 2.5rem; margin-bottom: 12px;">🔔</div>
-            <h3 style="color: #00e5ff; margin-bottom: 8px;">
-                Activar notificaciones
-            </h3>
-            <p style="color: #aad4e0; font-size: 0.9rem; margin-bottom: 24px;">
-                Elige cómo abrir Telegram:
-            </p>
+            <div style="font-size:2.4rem;margin-bottom:12px">🔔</div>
+            <h3 style="color:#0a3d7c;margin-bottom:8px;font-size:18px">Activar notificaciones</h3>
+            <p style="color:#64748b;font-size:13px;margin-bottom:24px">Elige cómo abrir Telegram:</p>
 
-            <div style="display: flex; flex-direction: column; gap: 12px; margin-bottom: 20px;">
-
+            <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
                 <a href="${linkNativo}" target="_blank" rel="noopener noreferrer"
-                    style="
-                        display: flex; align-items: center; gap: 12px;
-                        background: #00e5ff; color: #000d1a;
-                        padding: 14px 20px; border-radius: 10px;
-                        text-decoration: none; font-weight: bold; font-size: 0.95rem;
-                    ">
-                    <span style="font-size:1.4rem">💻</span>
-                    <span>Tengo Telegram instalado en el PC</span>
+                    style="display:flex;align-items:center;gap:12px;
+                           background:#0a3d7c;color:#fff;
+                           padding:13px 18px;border-radius:10px;
+                           text-decoration:none;font-weight:600;font-size:14px">
+                    <span style="font-size:1.3rem">💻</span>
+                    <span>Tengo Telegram instalado</span>
                 </a>
-
                 <a href="${linkTelegramWeb}" target="_blank" rel="noopener noreferrer"
-                    style="
-                        display: flex; align-items: center; gap: 12px;
-                        background: #0d2d3d; color: #00e5ff;
-                        border: 1px solid #00e5ff55;
-                        padding: 14px 20px; border-radius: 10px;
-                        text-decoration: none; font-weight: bold; font-size: 0.95rem;
-                    ">
-                    <span style="font-size:1.4rem">🌐</span>
-                    <span>Usar Telegram Web (sin instalar)</span>
+                    style="display:flex;align-items:center;gap:12px;
+                           background:#e3f0fb;color:#1565c0;
+                           border:1.5px solid #b0cef0;
+                           padding:13px 18px;border-radius:10px;
+                           text-decoration:none;font-weight:600;font-size:14px">
+                    <span style="font-size:1.3rem">🌐</span>
+                    <span>Usar Telegram Web</span>
                 </a>
             </div>
 
             <div style="
-                background: #0a1a2a; border-radius: 10px;
-                padding: 14px 16px; text-align: left;
-                font-size: 0.85rem; color: #7ab8cc;
-                border: 1px solid #00e5ff22; margin-bottom: 20px;
+                background:#f0f5fb;border-radius:10px;
+                padding:12px 14px;text-align:left;
+                font-size:12px;color:#64748b;
+                border:1px solid #dde7f2;margin-bottom:20px;
             ">
-                <b style="color:#00e5ff">Si usas Telegram Web:</b><br>
+                <b style="color:#0a3d7c">Si usas Telegram Web:</b><br>
                 1. Inicia sesión con tu número<br>
                 2. El bot se abrirá automáticamente<br>
-                3. Presiona <b style="color:#00e5ff">START</b>
+                3. Presiona <b style="color:#0a3d7c">START</b>
             </div>
 
             <button id="btnCerrarInstruccion" style="
-                padding: 10px 28px; background: transparent;
-                color: #aad4e0; border: 1px solid #00e5ff44;
-                border-radius: 8px; cursor: pointer; font-size: 0.9rem;
+                padding:9px 24px;background:transparent;
+                color:#64748b;border:1.5px solid #dde7f2;
+                border-radius:8px;cursor:pointer;font-size:13px;
+                font-family:'DM Sans',sans-serif;
             ">Cerrar</button>
         </div>
     `;
@@ -564,12 +338,10 @@ function mostrarModalInstruccion(cedula, cronogramaId) {
     document.body.appendChild(modal);
     document.getElementById('btnCerrarInstruccion')
         .addEventListener('click', () => modal.remove());
-    modal.addEventListener('click', e => {
-        if (e.target === modal) modal.remove();
-    });
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 }
 
-// ── Polling: espera que el estudiante presione Start ───────
+// ── Polling ──────────────────────────────────────────────────
 let pollingInterval = null;
 function iniciarPolling(cronogramaId) {
     if (pollingInterval) return;
@@ -578,15 +350,13 @@ function iniciarPolling(cronogramaId) {
         intentos++;
         await procesarRegistros();
 
-        // Revisar si ya se guardó el chatId
         const lista = await obtenerCronogramas();
         const crono = lista.find(c => c.id === cronogramaId);
-        const est = crono?.estudiantesVinculados?.[PARAM_CEDULA];
+        const est   = crono?.estudiantesVinculados?.[PARAM_CEDULA];
 
         if (est?.telegramChatId) {
             clearInterval(pollingInterval);
             pollingInterval = null;
-            // Actualizar botón
             const btn = document.getElementById('btnNotificaciones');
             if (btn) {
                 btn.classList.add('notif-activa');
@@ -595,17 +365,17 @@ function iniciarPolling(cronogramaId) {
             mostrarToast('✅ ¡Notificaciones activadas correctamente!');
         }
 
-        if (intentos >= 24) { // 2 minutos máximo
+        if (intentos >= 24) {
             clearInterval(pollingInterval);
             pollingInterval = null;
         }
-    }, 5000); // cada 5 segundos
+    }, 5000);
 }
 
-// ── Render del grid ──────────────────────────────────────
+// ── Render del grid ──────────────────────────────────────────
 function renderGrid(lista) {
-    const grid = document.getElementById('gridCronogramas');
-    const vacia = document.getElementById('vistaVacia');
+    const grid    = document.getElementById('gridCronogramas');
+    const vacia   = document.getElementById('vistaVacia');
     const filtrados = filtrarLista(lista);
 
     grid.innerHTML = '';
@@ -630,30 +400,29 @@ function actualizarContador(n, filtro) {
 
 function actividadFinalizada(fechaFin) {
     if (!fechaFin) return false;
-    const hoy = new Date();
-    hoy.setHours(0, 0, 0, 0);
+    const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
     const fin = new Date(fechaFin + 'T23:59:59');
     return fin < hoy;
 }
 
-// ── Modal ─────────────────────────────────────────────────
+// ── Modal detalle ────────────────────────────────────────────
 function abrirModal(c) {
     const estado = calcularEstado(c.fechaInicio, c.fechaFin);
 
-    document.getElementById('modalHeader').style.background = c.colorFondo ?? '#1976d2';
-    document.getElementById('modalHeader').style.color = c.colorTexto ?? '#ffffff';
+    document.getElementById('modalHeader').style.background  = c.colorFondo ?? '#1565c0';
+    document.getElementById('modalHeader').style.color       = c.colorTexto ?? '#ffffff';
     document.getElementById('modalHeader').style.borderColor = c.colorBorde ?? '#0d47a1';
-    document.getElementById('modalHeader').style.fontFamily = c.fuente ?? 'Arial';
+    document.getElementById('modalHeader').style.fontFamily  = c.fuente ?? 'DM Sans, sans-serif';
 
-    document.getElementById('modalBadge').innerHTML = badgeEstado(estado);
-    document.getElementById('modalNombre').textContent = c.nombre ?? '—';
-    document.getElementById('modalPeriodo').textContent = c.periodo ?? '—';
-    document.getElementById('modalFechaInicio').textContent = formatearFecha(c.fechaInicio);
-    document.getElementById('modalFechaFin').textContent = formatearFecha(c.fechaFin);
+    document.getElementById('modalBadge').innerHTML          = badgeEstado(estado);
+    document.getElementById('modalNombre').textContent       = c.nombre ?? '—';
+    document.getElementById('modalPeriodo').textContent      = c.periodo ?? '—';
+    document.getElementById('modalFechaInicio').textContent  = formatearFecha(c.fechaInicio);
+    document.getElementById('modalFechaFin').textContent     = formatearFecha(c.fechaFin);
     document.getElementById('modalFechaPublicacion').textContent = formatearFecha(c.fechaPublicacion);
 
     const actividades = c.actividades ?? [];
-    const tabla = document.getElementById('modalTabla');
+    const tabla       = document.getElementById('modalTabla');
 
     if (actividades.length === 0) {
         tabla.innerHTML = '<p class="sin-actividades">Sin actividades registradas.</p>';
@@ -673,8 +442,8 @@ function abrirModal(c) {
                         <tr class="${actividadFinalizada(a.fechaFin) ? 'actividad-finalizada' : ''}">
                             <td class="td-num">
                                 ${actividadFinalizada(a.fechaFin)
-                ? '<i class="ti ti-check"></i>'
-                : i + 1}
+                                    ? '<i class="ti ti-check"></i>'
+                                    : i + 1}
                             </td>
                             <td>${a.actividad}</td>
                             <td class="td-fecha">${formatearFecha(a.fechaInicio)}</td>
@@ -695,9 +464,8 @@ function cerrarModal() {
     document.body.style.overflow = '';
 }
 
-// ── Filtros (solo en modo admin) ─────────────────────────
+// ── Filtros (solo en modo admin) ─────────────────────────────
 function initFiltros() {
-    // Si es modo estudiante, ocultar los filtros
     if (MODO_ESTUDIANTE) {
         const filtrosEl = document.querySelector('.filtros');
         if (filtrosEl) filtrosEl.style.display = 'none';
@@ -715,13 +483,11 @@ function initFiltros() {
     });
 }
 
-// ── Init ──────────────────────────────────────────────────
+// ── Init ──────────────────────────────────────────────────────
 document.addEventListener('DOMContentLoaded', () => {
-    initReactor();
     iniciarReloj();
     initFiltros();
 
-    // Panel estudiante (solo en modo estudiante)
     if (MODO_ESTUDIANTE && PARAM_CRONO_ID) {
         renderPanelEstudiante(PARAM_CRONO_ID);
     }
@@ -739,7 +505,6 @@ document.addEventListener('DOMContentLoaded', () => {
         renderGrid(lista);
     });
 
-    // Revisar actividades de hoy y notificar (se ejecuta al cargar la página)
     if (MODO_ESTUDIANTE) {
         revisarYNotificar();
     }

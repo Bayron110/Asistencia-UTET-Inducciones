@@ -2,10 +2,10 @@
 <html lang="es">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Cronogramas</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
+    <title>Cronogramas — ITSOMET</title>
 
-    <!-- Tabler icons -->
+    <!-- Tabler Icons -->
     <link rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
 
@@ -13,50 +13,51 @@
 </head>
 <body>
 
-    <!-- Canvas del reactor -->
-    <canvas id="reactorBg"></canvas>
-
     <div class="layout">
 
-        <!-- HEADER -->
+        <!-- ══ HEADER INSTITUCIONAL ══ -->
         <header class="top-bar">
             <div class="top-bar-left">
-                <i class="ti ti-calendar-event"></i>
-                <span>Cronogramas Académicos</span>
+                <img
+                    src="https://i.postimg.cc/FRWLqCVN/logo-Itsqmet.png"
+                    alt="ITSOMET"
+                    class="top-bar-logo"
+                    onerror="this.style.display='none'">
+                <div class="top-bar-divider"></div>
+                <div class="top-bar-titulo">
+                    <span>Cronogramas Académicos</span>
+                    <span>Instituto Tecnológico Superior Quito Metropolitano</span>
+                </div>
             </div>
             <div class="top-bar-right">
                 <span id="reloj" class="reloj"></span>
             </div>
         </header>
 
-        <!-- CONTENIDO -->
+        <!-- ══ CONTENIDO ══ -->
         <main class="contenido">
-<!-- Panel estudiante -->
-<div id="panelEstudiante" class="panel-estudiante oculto"></div>
 
-            <!-- Filtros -->
+            <!-- Panel estudiante (se muestra solo en modo estudiante) -->
+            <div id="panelEstudiante" class="panel-estudiante oculto"></div>
+
+            <!-- Filtros (solo en modo admin) -->
             <div class="filtros">
-
                 <button class="filtro-btn active" data-estado="TODOS">
                     <span class="filtro-dot"></span>
                     Todos
                 </button>
-
                 <button class="filtro-btn" data-estado="VIGENTE">
                     <span class="filtro-dot vigente"></span>
                     Vigentes
                 </button>
-
                 <button class="filtro-btn" data-estado="PROGRAMADO">
                     <span class="filtro-dot programado"></span>
                     Programados
                 </button>
-
                 <button class="filtro-btn" data-estado="FINALIZADO">
                     <span class="filtro-dot finalizado"></span>
                     Finalizados
                 </button>
-
             </div>
 
             <!-- Contador -->
@@ -66,12 +67,9 @@
 
             <!-- Grid de cronogramas -->
             <div id="gridCronogramas" class="grid-cronogramas">
-
-                <!-- Skeleton de carga -->
                 <div class="skeleton-card"></div>
                 <div class="skeleton-card"></div>
                 <div class="skeleton-card"></div>
-
             </div>
 
             <!-- Vista vacía -->
@@ -85,7 +83,7 @@
 
     </div>
 
-    <!-- Modal detalle -->
+    <!-- ══ MODAL DETALLE ══ -->
     <div id="modalOverlay" class="modal-overlay oculto">
         <div class="modal">
 
