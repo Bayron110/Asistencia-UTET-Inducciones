@@ -17,18 +17,15 @@ if (!PARAM_CEDULA || !PARAM_CRONO_ID) {
 }
 
 const MODO_ESTUDIANTE = true;
-const imagenesFondo = [
-    "https://i.postimg.cc/tCMHT32d/Luti-ITSQMET.webp",
-    "https://i.postimg.cc/2ymLNnL1/Gemini-Generated-Image-80jds680jds680jd.png",
-    "https://i.postimg.cc/pL9T7scs/Gemini-Generated-Image-fv1l41fv1l41fv1l.png",
-    "https://i.postimg.cc/t4PbWwMq/Gemini-Generated-Image-hywuhqhywuhqhywu.png"
+const videos = [
+    "../videos/Animación_Fondo.mp4"
 ];
 
-const imagenAleatoria =
-    imagenesFondo[Math.floor(Math.random() * imagenesFondo.length)];
+const videoAleatorio =
+    videos[Math.floor(Math.random() * videos.length)];
 
-document.querySelector(".bg-img").style.backgroundImage =
-    `url('${imagenAleatoria}')`;
+document.getElementById("videoIzq").src = videoAleatorio;
+document.getElementById("videoDer").src = videoAleatorio;
 
 let todosLosCronogramas = [];
 let filtroActual = 'TODOS';
