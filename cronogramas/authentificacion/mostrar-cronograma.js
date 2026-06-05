@@ -17,6 +17,18 @@ if (!PARAM_CEDULA || !PARAM_CRONO_ID) {
 }
 
 const MODO_ESTUDIANTE = true;
+const imagenesFondo = [
+    "https://i.postimg.cc/tCMHT32d/Luti-ITSQMET.webp",
+    "https://i.postimg.cc/2ymLNnL1/Gemini-Generated-Image-80jds680jds680jd.png",
+    "https://i.postimg.cc/pL9T7scs/Gemini-Generated-Image-fv1l41fv1l41fv1l.png",
+    "https://i.postimg.cc/t4PbWwMq/Gemini-Generated-Image-hywuhqhywuhqhywu.png"
+];
+
+const imagenAleatoria =
+    imagenesFondo[Math.floor(Math.random() * imagenesFondo.length)];
+
+document.querySelector(".bg-img").style.backgroundImage =
+    `url('${imagenAleatoria}')`;
 
 let todosLosCronogramas = [];
 let filtroActual = 'TODOS';
@@ -487,7 +499,4 @@ document.addEventListener('DOMContentLoaded', () => {
         renderGrid(lista);
     });
 
-    if (MODO_ESTUDIANTE) {
-        revisarYNotificar();
-    }
 });
