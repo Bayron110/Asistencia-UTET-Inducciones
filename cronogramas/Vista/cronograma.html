@@ -4,12 +4,11 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 
-    <title>Cronogramas — ITSOMET</title>
+    <title>Cronogramas — ITSQMET</title>
 
     <!-- Tabler Icons -->
     <link rel="stylesheet"
         href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-
     <link rel="stylesheet" href="../estilos/cronograma.css">
 </head>
 <body>
@@ -32,6 +31,14 @@
         muted
         playsinline>
     </video>
+    <div id="bgWrapper">
+    <canvas id="particulas"></canvas>  <!-- ← agregar esto -->
+
+    <video id="videoIzq" class="video-lateral video-izq" autoplay muted playsinline loop></video>
+    <video id="videoDer" class="video-lateral video-der" autoplay muted playsinline loop></video>
+
+    <div class="bg-overlay"></div>
+</div>
 
     <div class="bg-overlay"></div>
 
@@ -187,6 +194,99 @@
     </div>
 
     <script type="module" src="../authentificacion/mostrar-cronograma.js"></script>
+
+    <script>
+(function() {
+    const canvas = document.getElementById('particulas');
+    const ctx    = canvas.getContext('2d');
+
+    let W, H, particulas = [];
+
+    const CONFIG = {
+        cantidad:    120,       // número de partículas
+        velocidad:   0.4,       // qué tan rápido se mueven
+        tamañoMin:   1,         // tamaño mínimo
+        tamañoMax:   3,         // tamaño máximo
+        opacidadMax: 0.7,       // opacidad máxima
+        colorBase:   '0, 229, 255',  // color en RGB (cyan institucional)
+        conexiones:  true,      // líneas entre partículas cercanas
+        distConex:   120,       // distancia máxima para conectar
+    };
+
+    function resize() {
+        W = canvas.width  = canvas.offsetWidth;
+        H = canvas.height = canvas.offsetHeight;
+    }
+
+    function crearParticula() {
+        return {
+            x:   Math.random() * W,
+            y:   Math.random() * H,
+            vx:  (Math.random() - 0.5) * CONFIG.velocidad,
+            vy:  (Math.random() - 0.5) * CONFIG.velocidad,
+            r:   CONFIG.tamañoMin + Math.random() * (CONFIG.tamañoMax - CONFIG.tamañoMin),
+            op:  Math.random() * CONFIG.opacidadMax,
+            dop: (Math.random() * 0.005 + 0.002) * (Math.random() < 0.5 ? 1 : -1),
+        };
+    }
+
+    function init() {
+        resize();
+        particulas = Array.from({ length: CONFIG.cantidad }, crearParticula);
+    }
+
+    function dibujar() {
+        ctx.clearRect(0, 0, W, H);
+
+        particulas.forEach((p, i) => {
+            // Mover
+            p.x  += p.vx;
+            p.y  += p.vy;
+            p.op += p.dop;
+
+            // Rebotar bordes
+            if (p.x < 0 || p.x > W) p.vx *= -1;
+            if (p.y < 0 || p.y > H) p.vy *= -1;
+
+            // Pulso de opacidad
+            if (p.op <= 0.05 || p.op >= CONFIG.opacidadMax) p.dop *= -1;
+            p.op = Math.max(0.05, Math.min(CONFIG.opacidadMax, p.op));
+
+            // Dibujar punto
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${CONFIG.colorBase}, ${p.op})`;
+            ctx.fill();
+
+            // Dibujar conexiones
+            if (!CONFIG.conexiones) return;
+            for (let j = i + 1; j < particulas.length; j++) {
+                const q    = particulas[j];
+                const dist = Math.hypot(p.x - q.x, p.y - q.y);
+                if (dist < CONFIG.distConex) {
+                    const alpha = (1 - dist / CONFIG.distConex) * 0.25;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(q.x, q.y);
+                    ctx.strokeStyle = `rgba(${CONFIG.colorBase}, ${alpha})`;
+                    ctx.lineWidth   = 0.5;
+                    ctx.stroke();
+                }
+            }
+        });
+
+        requestAnimationFrame(dibujar);
+    }
+
+    window.addEventListener('resize', () => {
+        resize();
+        init();
+    });
+
+    init();
+    dibujar();
+})();
+</script>
 
 </body>
 </html>

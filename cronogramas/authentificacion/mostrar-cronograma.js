@@ -1,5 +1,5 @@
 // ── mostrar-cronograma.js ────────────────────────────────────
-// ?cedula=XXXXXXXXXX&cronogramaId=abc123
+// ?cedula=XXXXXXXXXX&cronogramaId=abc123&tipo=estudiante|docente&cronogramas=id1,id2
 // Sin parámetros → redirige a cedula-solicitud.html
 // ─────────────────────────────────────────────────────────────
 
@@ -11,19 +11,20 @@ const BOT_USERNAME = 'itsometcronogramas_bot';
 const urlParams       = new URLSearchParams(window.location.search);
 const PARAM_CEDULA    = urlParams.get('cedula');
 const PARAM_CRONO_ID  = urlParams.get('cronogramaId');
+const PARAM_TIPO      = urlParams.get('tipo') ?? 'estudiante'; // 'estudiante' | 'docente'
+const PARAM_CRONOS    = urlParams.get('cronogramas');          // solo docentes: "id1,id2,..."
 
 if (!PARAM_CEDULA || !PARAM_CRONO_ID) {
     window.location.replace('cedula-solicitud.html');
 }
 
-const MODO_ESTUDIANTE = true;
+const MODO_ESTUDIANTE = PARAM_TIPO !== 'docente';
+
 const videos = [
     "../videos/Animación_Fondo.mp4"
 ];
 
-const videoAleatorio =
-    videos[Math.floor(Math.random() * videos.length)];
-
+const videoAleatorio = videos[Math.floor(Math.random() * videos.length)];
 document.getElementById("videoIzq").src = videoAleatorio;
 document.getElementById("videoDer").src = videoAleatorio;
 
@@ -116,14 +117,22 @@ function crearCard(c) {
 // ── Filtrado ──────────────────────────────────────────────────
 function filtrarLista(lista) {
     let resultado = lista;
-    if (MODO_ESTUDIANTE && PARAM_CRONO_ID) {
+
+    if (PARAM_TIPO === 'docente' && PARAM_CRONOS) {
+        // Docente: mostrar todos sus cronogramas asignados
+        const ids = PARAM_CRONOS.split(',');
+        resultado = resultado.filter(c => ids.includes(c.id));
+    } else if (MODO_ESTUDIANTE && PARAM_CRONO_ID) {
+        // Estudiante: solo su cronograma
         resultado = resultado.filter(c => c.id === PARAM_CRONO_ID);
     }
+
     if (!MODO_ESTUDIANTE && filtroActual !== 'TODOS') {
         resultado = resultado.filter(c =>
             calcularEstado(c.fechaInicio, c.fechaFin) === filtroActual
         );
     }
+
     return resultado;
 }
 
@@ -244,6 +253,94 @@ async function renderPanelEstudiante(cronogramaId) {
             }
         });
     }
+}
+
+// ── Panel docente ─────────────────────────────────────────────
+async function renderPanelDocente(cronogramaId) {
+    const panel = document.getElementById('panelEstudiante'); // reutilizamos el mismo contenedor
+    if (!panel) return;
+
+    const lista  = await obtenerCronogramas();
+    const crono  = lista.find(c => c.id === cronogramaId);
+    if (!crono) return;
+
+    const docente       = crono.docentesVinculados?.[PARAM_CEDULA];
+    const nombre        = docente?.nombres ?? docente?.nombre ?? 'Docente';
+    const especialidad  = docente?.especialidad ?? docente?.carrera ?? '';
+
+    // Cronogramas asignados al docente
+    const cronogramasIds  = PARAM_CRONOS ? PARAM_CRONOS.split(',') : [cronogramaId];
+    const totalCronos     = cronogramasIds.length;
+
+    // Calcular actividades próximas en todos sus cronogramas
+    const cronosDocente   = lista.filter(c => cronogramasIds.includes(c.id));
+    const todasActividades = cronosDocente.flatMap(c =>
+        (c.actividades ?? []).map(a => ({ ...a, cronogramaNombre: c.nombre ?? '' }))
+    );
+    const proxAct = siguienteActividad(todasActividades);
+
+    // Contar actividades totales y finalizadas
+    const totalAct = todasActividades.length;
+    const hechas   = todasActividades.filter(a => {
+        if (!a.fechaFin) return false;
+        return new Date(a.fechaFin + 'T23:59:59') < new Date();
+    }).length;
+
+    panel.innerHTML = `
+        <div class="ep-perfil">
+            <div class="ep-avatar ep-avatar--docente">
+                <i class="ti ti-chalkboard"></i>
+            </div>
+            <div class="ep-info">
+                <h2 class="ep-nombre">${nombre}</h2>
+                <span class="ep-rol-badge">
+                    <i class="ti ti-id-badge-2"></i> Docente
+                </span>
+                ${especialidad ? `<span class="ep-carrera"><i class="ti ti-school"></i>${especialidad}</span>` : ''}
+            </div>
+        </div>
+
+        <div class="ep-progress-bloque">
+            <div class="ep-progress-header">
+                <span class="ep-progress-label">
+                    <i class="ti ti-calendar-stats"></i>
+                    Cronogramas asignados
+                </span>
+                <span class="ep-progress-pct">${totalCronos}</span>
+            </div>
+            <div class="ep-barra-bg">
+                <div class="ep-barra-fill" style="width:100%"></div>
+            </div>
+            <div class="ep-progress-sub">
+                <span>${totalCronos} cronograma${totalCronos !== 1 ? 's' : ''}</span>
+                <span>${totalAct} actividad${totalAct !== 1 ? 'es' : ''} en total</span>
+            </div>
+        </div>
+
+        ${proxAct ? `
+        <div class="ep-proxima">
+            <div class="ep-proxima-label">
+                <i class="ti ti-calendar-due"></i>
+                Próxima actividad
+                ${proxAct.cronogramaNombre
+                    ? `<span class="ep-proxima-crono">${proxAct.cronogramaNombre}</span>`
+                    : ''}
+            </div>
+            <div class="ep-proxima-nombre">${proxAct.actividad}</div>
+            <div class="ep-proxima-fecha">
+                <i class="ti ti-clock"></i>
+                ${formatearFecha(proxAct.fechaInicio)} → ${formatearFecha(proxAct.fechaFin)}
+            </div>
+        </div>
+        ` : `
+        <div class="ep-proxima ep-proxima--done">
+            <i class="ti ti-circle-check"></i>
+            <span>Todas las actividades completadas</span>
+        </div>
+        `}
+    `;
+
+    panel.classList.remove('oculto');
 }
 
 // ── Toast ─────────────────────────────────────────────────────
@@ -375,8 +472,8 @@ function iniciarPolling(cronogramaId) {
 
 // ── Grid ──────────────────────────────────────────────────────
 function renderGrid(lista) {
-    const grid     = document.getElementById('gridCronogramas');
-    const vacia    = document.getElementById('vistaVacia');
+    const grid      = document.getElementById('gridCronogramas');
+    const vacia     = document.getElementById('vistaVacia');
     const filtrados = filtrarLista(lista);
 
     grid.innerHTML = '';
@@ -458,7 +555,7 @@ function cerrarModal() {
     document.body.style.overflow = '';
 }
 
-// ── Filtros (solo modo admin) ─────────────────────────────────
+// ── Filtros (solo modo docente/admin) ────────────────────────
 function initFiltros() {
     if (MODO_ESTUDIANTE) {
         const filtrosEl = document.querySelector('.filtros');
@@ -481,8 +578,12 @@ document.addEventListener('DOMContentLoaded', () => {
     iniciarReloj();
     initFiltros();
 
-    if (MODO_ESTUDIANTE && PARAM_CRONO_ID) {
-        renderPanelEstudiante(PARAM_CRONO_ID);
+    if (PARAM_CRONO_ID) {
+        if (MODO_ESTUDIANTE) {
+            renderPanelEstudiante(PARAM_CRONO_ID);
+        } else {
+            renderPanelDocente(PARAM_CRONO_ID);
+        }
     }
 
     document.getElementById('btnCerrarModal').addEventListener('click', cerrarModal);
@@ -495,5 +596,4 @@ document.addEventListener('DOMContentLoaded', () => {
         todosLosCronogramas = lista;
         renderGrid(lista);
     });
-
 });

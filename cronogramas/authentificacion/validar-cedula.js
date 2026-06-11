@@ -7,72 +7,92 @@ import { obtenerCronogramas } from '../../Firebase/cronograma.js';
 
 // ── Reactor canvas ─────────────────────────────────────────
 function initReactor() {
-    const canvas = document.getElementById('reactorBg');
+    // ── Video de fondo ──
+    const video = document.getElementById('videoBg');
+    if (video) {
+        video.src = '../videos/Animación_Fondo.mp4';
+    }
+
+    // ── Partículas ──
+    const canvas = document.getElementById('particulasBg');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
-    const resize = () => { canvas.width = window.innerWidth; canvas.height = window.innerHeight; };
-    resize();
-    window.addEventListener('resize', resize);
-    const ox = () => canvas.width * 0.5;
-    const oy = () => canvas.height * 0.5;
-    const rings = [
-        { r: 200, speed: 0.0015, dash: [1,5],  dir:  1, alpha: 0.15, width: 0.8 },
-        { r: 180, speed: 0.004,  dash: [40,12], dir: -1, alpha: 0.40, width: 2.0 },
-        { r: 155, speed: 0.007,  dash: [30,15], dir:  1, alpha: 0.45, width: 1.5 },
-        { r: 128, speed: 0.014,  dash: [25,20], dir: -1, alpha: 0.50, width: 1.5 },
-        { r: 100, speed: 0.020,  dash: [18,18], dir:  1, alpha: 0.55, width: 2.0 },
-        { r:  72, speed: 0.030,  dash: [12,8],  dir: -1, alpha: 0.45, width: 1.2 },
-        { r:  44, speed: 0.040,  dash: [8,4],   dir:  1, alpha: 0.70, width: 2.0 },
-    ];
-    const angles = rings.map(() => Math.random() * Math.PI * 2);
-    const particles = Array.from({ length: 60 }, () => ({
-        x: Math.random() * window.innerWidth,
-        y: Math.random() * window.innerHeight,
-        r: Math.random() * 1.5 + 0.3,
-        vx: (Math.random() - 0.5) * 0.25,
-        vy: -(Math.random() * 0.35 + 0.05),
-        alpha: Math.random() * 0.40 + 0.10,
-        pulse: Math.random() * Math.PI * 2,
-    }));
-    let corePhase = 0;
-    const draw = () => {
-        const w = canvas.width, h = canvas.height;
-        const cx = ox(), cy = oy();
-        ctx.clearRect(0, 0, w, h);
-        ctx.fillStyle = '#000d1a'; ctx.fillRect(0, 0, w, h);
-        const bgG = ctx.createRadialGradient(cx, cy, 0, cx, cy, 340);
-        bgG.addColorStop(0, 'rgba(0,80,120,0.18)'); bgG.addColorStop(1, 'rgba(0,0,0,0)');
-        ctx.fillStyle = bgG; ctx.fillRect(0, 0, w, h);
-        rings.forEach((ring, i) => {
-            angles[i] += ring.speed * ring.dir;
-            ctx.save(); ctx.translate(cx, cy); ctx.rotate(angles[i]);
-            ctx.beginPath(); ctx.arc(0, 0, ring.r, 0, Math.PI * 2);
-            ctx.strokeStyle = `rgba(0,229,255,${ring.alpha})`;
-            ctx.lineWidth = ring.width; ctx.setLineDash(ring.dash); ctx.stroke();
-            ctx.restore();
-        });
-        ctx.setLineDash([]);
-        corePhase += 0.025;
-        const cp = 0.75 + 0.25 * Math.sin(corePhase);
-        const halo = ctx.createRadialGradient(cx, cy, 0, cx, cy, 45 * cp);
-        halo.addColorStop(0, 'rgba(0,229,255,0.14)'); halo.addColorStop(1, 'rgba(0,229,255,0)');
-        ctx.beginPath(); ctx.arc(cx, cy, 45 * cp, 0, Math.PI * 2); ctx.fillStyle = halo; ctx.fill();
-        const sphere = ctx.createRadialGradient(cx - 3, cy - 3, 1, cx, cy, 18);
-        sphere.addColorStop(0, 'rgba(180,240,255,0.9)');
-        sphere.addColorStop(0.5, 'rgba(0,229,255,0.8)');
-        sphere.addColorStop(1, 'rgba(0,30,60,0.85)');
-        ctx.beginPath(); ctx.arc(cx, cy, 18, 0, Math.PI * 2); ctx.fillStyle = sphere; ctx.fill();
-        particles.forEach(p => {
-            p.pulse += 0.018;
-            const a = p.alpha * (0.65 + 0.35 * Math.sin(p.pulse));
-            ctx.beginPath(); ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
-            ctx.fillStyle = `rgba(0,229,255,${a})`; ctx.fill();
-            p.x += p.vx; p.y += p.vy;
-            if (p.y < -5) { p.y = canvas.height + 5; p.x = Math.random() * canvas.width; }
-        });
-        requestAnimationFrame(draw);
+
+    let W, H, particulas = [];
+
+    const CONFIG = {
+        cantidad:    120,
+        velocidad:   0.4,
+        tamañoMin:   1,
+        tamañoMax:   3,
+        opacidadMax: 0.7,
+        colorBase:   '0, 229, 255',
+        conexiones:  true,
+        distConex:   120,
     };
-    draw();
+
+    function resize() {
+        W = canvas.width  = canvas.offsetWidth;
+        H = canvas.height = canvas.offsetHeight;
+    }
+
+    function crearParticula() {
+        return {
+            x:   Math.random() * W,
+            y:   Math.random() * H,
+            vx:  (Math.random() - 0.5) * CONFIG.velocidad,
+            vy:  (Math.random() - 0.5) * CONFIG.velocidad,
+            r:   CONFIG.tamañoMin + Math.random() * (CONFIG.tamañoMax - CONFIG.tamañoMin),
+            op:  Math.random() * CONFIG.opacidadMax,
+            dop: (Math.random() * 0.005 + 0.002) * (Math.random() < 0.5 ? 1 : -1),
+        };
+    }
+
+    function init() {
+        resize();
+        particulas = Array.from({ length: CONFIG.cantidad }, crearParticula);
+    }
+
+    function dibujar() {
+        ctx.clearRect(0, 0, W, H);
+
+        particulas.forEach((p, i) => {
+            p.x  += p.vx;
+            p.y  += p.vy;
+            p.op += p.dop;
+
+            if (p.x < 0 || p.x > W) p.vx *= -1;
+            if (p.y < 0 || p.y > H) p.vy *= -1;
+            if (p.op <= 0.05 || p.op >= CONFIG.opacidadMax) p.dop *= -1;
+            p.op = Math.max(0.05, Math.min(CONFIG.opacidadMax, p.op));
+
+            ctx.beginPath();
+            ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+            ctx.fillStyle = `rgba(${CONFIG.colorBase}, ${p.op})`;
+            ctx.fill();
+
+            if (!CONFIG.conexiones) return;
+            for (let j = i + 1; j < particulas.length; j++) {
+                const q    = particulas[j];
+                const dist = Math.hypot(p.x - q.x, p.y - q.y);
+                if (dist < CONFIG.distConex) {
+                    const alpha = (1 - dist / CONFIG.distConex) * 0.25;
+                    ctx.beginPath();
+                    ctx.moveTo(p.x, p.y);
+                    ctx.lineTo(q.x, q.y);
+                    ctx.strokeStyle = `rgba(${CONFIG.colorBase}, ${alpha})`;
+                    ctx.lineWidth   = 0.5;
+                    ctx.stroke();
+                }
+            }
+        });
+
+        requestAnimationFrame(dibujar);
+    }
+
+    window.addEventListener('resize', () => { resize(); init(); });
+    init();
+    dibujar();
 }
 
 // ── Validación cédula ecuatoriana ──────────────────────────
@@ -115,17 +135,46 @@ function setLoading(on) {
 
 // ── Búsqueda en Realtime Database ──────────────────────────
 // Devuelve { cronogramaId, nombre } o null si no encuentra.
+// ── Búsqueda en Realtime Database ──────────────────────────
+// Busca en estudiantesVinculados Y docentesVinculados
 async function buscarCronograma(cedula) {
     const cronogramas = await obtenerCronogramas();
-    const encontrado = cronogramas.find(c =>
+
+    // ── Buscar en estudiantes ──────────────────────────────
+    const cronoEstudiante = cronogramas.find(c =>
         c.estudiantesVinculados && c.estudiantesVinculados[cedula]
     );
-    if (!encontrado) return null;
-    const estudiante = encontrado.estudiantesVinculados[cedula];
-    return {
-        cronogramaId: encontrado.id,
-        nombre: estudiante?.nombres ?? estudiante?.nombre ?? 'Estimado/a estudiante'
-    };
+
+    if (cronoEstudiante) {
+        const est = cronoEstudiante.estudiantesVinculados[cedula];
+        return {
+            cronogramaId: cronoEstudiante.id,
+            nombre:       est?.nombres ?? est?.nombre ?? 'Estimado/a estudiante',
+            tipo:         'estudiante'
+        };
+    }
+
+    // ── Buscar en docentes ─────────────────────────────────
+    // El docente puede estar en varios cronogramas — buscamos el primero que lo tenga
+    const cronoDocente = cronogramas.find(c =>
+        c.docentesVinculados && c.docentesVinculados[cedula]
+    );
+
+    if (cronoDocente) {
+        const doc = cronoDocente.docentesVinculados[cedula];
+        // Los cronogramas asignados al docente están en cronogramasAsignados[]
+        const cronogramasAsignados = doc?.cronogramasAsignados ?? [cronoDocente.id];
+        return {
+            // Para docente mandamos el primer cronogramaId asignado
+            // (en cronograma.html luego se cargarán todos)
+            cronogramaId:         cronogramasAsignados[0],
+            cronogramasAsignados: cronogramasAsignados,
+            nombre: doc?.nombres ?? doc?.nombre ?? 'Docente',
+            tipo:                 'docente'
+        };
+    }
+
+    return null;
 }
 
 // ── Pantalla de bienvenida ─────────────────────────────────
@@ -150,6 +199,7 @@ function mostrarBienvenida(nombre, destino) {
 }
 
 // ── Flujo principal ────────────────────────────────────────
+// ── Flujo principal ────────────────────────────────────────
 async function consultar() {
     const cedula = document.getElementById('inputCedula').value.trim();
     ocultarError();
@@ -166,9 +216,17 @@ async function consultar() {
             mostrarError('No se encontró un cronograma asignado para esta cédula.');
             return;
         }
+
         const params = new URLSearchParams({ cedula, cronogramaId: resultado.cronogramaId });
+
+        // Si es docente, pasamos todos sus cronogramas asignados
+        if (resultado.tipo === 'docente') {
+            params.set('tipo', 'docente');
+            params.set('cronogramas', resultado.cronogramasAsignados.join(','));
+        }
+
         mostrarBienvenida(resultado.nombre, `cronograma.html?${params.toString()}`);
-        console.log('Estudiante encontrado:', resultado);
+
     } catch (err) {
         console.error('Error buscando cronograma:', err);
         mostrarError('Ocurrió un error al consultar. Intenta nuevamente.');

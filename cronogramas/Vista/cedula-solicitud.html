@@ -1,44 +1,58 @@
 <!DOCTYPE html>
 <html lang="es">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Acceso a Cronograma</title>
-
-    <link rel="stylesheet"
-        href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
-
+    <title>Acceso a Cronograma — ITSOMET</title>
     <link rel="stylesheet" href="../estilos/cedula.css">
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@tabler/icons-webfont@latest/tabler-icons.min.css">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0">
 </head>
+
 <body>
 
-    <canvas id="reactorBg"></canvas>
+    <!-- ── Fondo ── -->
+    <div id="bgWrapper">
+        <video id="videoBg" autoplay muted playsinline></video>
+        <canvas id="particulasBg"></canvas>
+        <div class="bg-overlay"></div>
+    </div>
 
+    <!-- ── Contenido ── -->
     <div class="cedula-wrapper">
-
         <div class="cedula-card">
 
+            <!-- Logo -->
+            <div class="cedula-logo">
+                <img src="https://i.postimg.cc/FRWLqCVN/logo-Itsqmet.png" alt="ITSOMET"
+                    onerror="this.style.display='none'">
+            </div>
+
+            <!-- Icono -->
             <div class="cedula-icon">
                 <i class="ti ti-id-badge-2"></i>
             </div>
 
             <h1 class="cedula-titulo">Consulta tu Cronograma</h1>
-            <p class="cedula-subtitulo">Ingresa tu número de cédula para ver las actividades académicas asignadas a ti.</p>
+            <p class="cedula-subtitulo">Ingresa tu número de cédula para ver las actividades académicas asignadas a ti.
+            </p>
+
+            <div class="cedula-divider"></div>
 
             <div class="cedula-form">
 
-                <div class="input-grupo" id="inputGrupo">
-                    <i class="ti ti-credit-card input-icono"></i>
-                    <input
-                        type="text"
-                        id="inputCedula"
-                        class="cedula-input"
-                        placeholder="0000000000"
-                        maxlength="10"
-                        inputmode="numeric"
-                        autocomplete="off"
-                    />
-                    <span class="input-contador" id="contador">0/10</span>
+                <div>
+                    <p class="input-label">
+                        <i class="ti ti-credit-card"></i>
+                        Número de cédula
+                    </p>
+                    <div class="input-grupo" id="inputGrupo">
+                        <i class="ti ti-credit-card input-icono"></i>
+                        <input type="text" id="inputCedula" class="cedula-input" placeholder="0000000000" maxlength="10"
+                            inputmode="numeric" autocomplete="off" />
+                        <span class="input-contador" id="contador">0/10</span>
+                    </div>
                 </div>
 
                 <p class="error-msg oculto" id="errorMsg">
@@ -59,10 +73,103 @@
 
             </div>
 
-        </div>
+            <p class="cedula-footer">
+                Instituto Tecnológico Superior Quito Metropolitano<br>
+                Sistema de Cronogramas Académicos
+            </p>
 
+        </div>
     </div>
 
     <script type="module" src="../authentificacion/validar-cedula.js"></script>
+
+    <script>
+        // ── Video fondo ──
+        (function () {
+            const video = document.getElementById('videoBg');
+            if (video) video.src = '../videos/Animación_Fondo.mp4';
+        })();
+
+        // ── Partículas ──
+        (function () {
+            const canvas = document.getElementById('particulasBg');
+            if (!canvas) return;
+            const ctx = canvas.getContext('2d');
+            let W, H, particulas = [];
+
+            const CONFIG = {
+                cantidad: 110,
+                velocidad: 0.35,
+                tamañoMin: 0.8,
+                tamañoMax: 2.5,
+                opacidadMax: 0.65,
+                colorBase: '0, 229, 255',
+                conexiones: true,
+                distConex: 110,
+            };
+
+            function resize() {
+                W = canvas.width = window.innerWidth;
+                H = canvas.height = window.innerHeight;
+            }
+
+            function crearParticula() {
+                return {
+                    x: Math.random() * W,
+                    y: Math.random() * H,
+                    vx: (Math.random() - 0.5) * CONFIG.velocidad,
+                    vy: (Math.random() - 0.5) * CONFIG.velocidad,
+                    r: CONFIG.tamañoMin + Math.random() * (CONFIG.tamañoMax - CONFIG.tamañoMin),
+                    op: Math.random() * CONFIG.opacidadMax,
+                    dop: (Math.random() * 0.004 + 0.001) * (Math.random() < 0.5 ? 1 : -1),
+                };
+            }
+
+            function init() {
+                resize();
+                particulas = Array.from({ length: CONFIG.cantidad }, crearParticula);
+            }
+
+            function dibujar() {
+                ctx.clearRect(0, 0, W, H);
+                particulas.forEach((p, i) => {
+                    p.x += p.vx;
+                    p.y += p.vy;
+                    p.op += p.dop;
+                    if (p.x < 0 || p.x > W) p.vx *= -1;
+                    if (p.y < 0 || p.y > H) p.vy *= -1;
+                    if (p.op <= 0.03 || p.op >= CONFIG.opacidadMax) p.dop *= -1;
+                    p.op = Math.max(0.03, Math.min(CONFIG.opacidadMax, p.op));
+
+                    ctx.beginPath();
+                    ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+                    ctx.fillStyle = `rgba(${CONFIG.colorBase}, ${p.op})`;
+                    ctx.fill();
+
+                    if (!CONFIG.conexiones) return;
+                    for (let j = i + 1; j < particulas.length; j++) {
+                        const q = particulas[j];
+                        const dist = Math.hypot(p.x - q.x, p.y - q.y);
+                        if (dist < CONFIG.distConex) {
+                            const alpha = (1 - dist / CONFIG.distConex) * 0.22;
+                            ctx.beginPath();
+                            ctx.moveTo(p.x, p.y);
+                            ctx.lineTo(q.x, q.y);
+                            ctx.strokeStyle = `rgba(${CONFIG.colorBase}, ${alpha})`;
+                            ctx.lineWidth = 0.5;
+                            ctx.stroke();
+                        }
+                    }
+                });
+                requestAnimationFrame(dibujar);
+            }
+
+            window.addEventListener('resize', () => { resize(); init(); });
+            init();
+            dibujar();
+        })();
+    </script>
+
 </body>
+
 </html>
