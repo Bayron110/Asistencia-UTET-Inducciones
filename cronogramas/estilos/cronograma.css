@@ -1443,3 +1443,8 @@ body {
     0%, 100% { text-shadow: 0 0 40px rgba(0,229,255,0.5), 0 0 80px rgba(0,229,255,0.2); }
     50%       { text-shadow: 0 0 60px rgba(0,229,255,0.8), 0 0 120px rgba(0,229,255,0.4); }
 }
+.ep-proximas-lista {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+}

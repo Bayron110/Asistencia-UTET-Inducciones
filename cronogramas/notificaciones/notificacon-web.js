@@ -4,7 +4,6 @@
 // Compatible con plan Spark (sin Cloud Functions).
 // ──────────────────────────────────────────────────────────
 
-// DESPUÉS
 import { obtenerCronogramas } from '../../Firebase/cronograma.js';
 import { getApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
 import { getDatabase, ref, update }
@@ -39,19 +38,49 @@ export async function enviarMensajeTelegram(chatId, texto) {
     }
 }
 
-// ── Guardar chatId en Firebase ─────────────────────────────
+// ── Guardar chatId para ESTUDIANTE ────────────────────────
+// Escribe en: cronogramas/{cronogramaId}/estudiantesVinculados/{cedula}
 export async function guardarChatId(cronogramaId, cedula, chatId) {
     try {
-        const app = getApp('cronogramas'); // ← misma app que usa cronograma.js
-        const db  = getDatabase(app);      // ← ahora sí encuentra Firebase
-
+        const app = getApp('cronogramas');
+        const db  = getDatabase(app);
         await update(
             ref(db, `cronogramas/${cronogramaId}/estudiantesVinculados/${cedula}`),
             { telegramChatId: chatId, notificacionesActivas: true }
         );
         return true;
     } catch (err) {
-        console.error('Error guardando chatId:', err);
+        console.error('Error guardando chatId estudiante:', err);
+        return false;
+    }
+}
+
+// ── Guardar chatId para DOCENTE ───────────────────────────
+// Escribe en: cronogramas/{cronogramaId}/docentesVinculados/{cedula}
+// Y también en /docentes/{cedula} para que persista independiente
+async function guardarChatIdDocente(cronogramaId, cedula, chatId) {
+    try {
+        const app = getApp('cronogramas');
+        const db  = getDatabase(app);
+
+        const payload = { telegramChatId: chatId, notificacionesActivas: true };
+
+        // 1. Actualizar referencia dentro del cronograma
+        await update(
+            ref(db, `cronogramas/${cronogramaId}/docentesVinculados/${cedula}`),
+            payload
+        );
+
+        // 2. Actualizar datos maestros del docente en /docentes/{cedula}
+        //    (persiste aunque el cronograma sea borrado)
+        await update(
+            ref(db, `docentes/${cedula}`),
+            payload
+        );
+
+        return true;
+    } catch (err) {
+        console.error('Error guardando chatId docente:', err);
         return false;
     }
 }
@@ -59,15 +88,13 @@ export async function guardarChatId(cronogramaId, cedula, chatId) {
 // ── Obtener updates del bot ────────────────────────────────
 async function obtenerUpdates() {
     try {
-        const url = `${TELEGRAM_API}/getUpdates?offset=${lastUpdateId + 1}&timeout=3&allowed_updates=["message"]`;
+        const url  = `${TELEGRAM_API}/getUpdates?offset=${lastUpdateId + 1}&timeout=3&allowed_updates=["message"]`;
         const res  = await fetch(url);
         const data = await res.json();
-
         if (!data.ok) {
             console.error('Telegram getUpdates error:', data);
             return [];
         }
-
         return data.result ?? [];
     } catch (err) {
         console.error('Error obteniendo updates:', err);
@@ -75,114 +102,168 @@ async function obtenerUpdates() {
     }
 }
 
-// ── Procesar el /start del estudiante ─────────────────────
+// ── Procesar /start de estudiante o docente ────────────────
+//
+// Formatos de payload:
+//   Estudiante : 1752222404-OuAUik_fumdsJv5ZDY_
+//   Docente    : DOC-1752222404-OuAUik_fumdsJv5ZDY_
+//
 export async function procesarRegistros() {
     const updates = await obtenerUpdates();
 
-    for (const update of updates) {
+    for (const upd of updates) {
 
-        // Actualizar offset para no reprocesar
-        if (update.update_id >= lastUpdateId) {
-            lastUpdateId = update.update_id;
+        if (upd.update_id >= lastUpdateId) {
+            lastUpdateId = upd.update_id;
         }
 
-        const msg = update.message;
+        const msg = upd.message;
         if (!msg || !msg.text) continue;
 
         const texto  = msg.text.trim();
         const chatId = String(msg.chat.id);
-        const nombre = msg.from?.first_name ?? 'Estudiante';
+        const nombre = msg.from?.first_name ?? 'Usuario';
 
         console.log('📩 Mensaje recibido:', texto, '| chatId:', chatId);
 
-if (texto.startsWith('/start')) {
-    const payload = texto.replace('/start', '').trim();
+        if (!texto.startsWith('/start')) continue;
 
-    console.log('📦 Payload recibido:', payload);
+        const payload = texto.replace('/start', '').trim();
+        console.log('📦 Payload recibido:', payload);
 
-    if (!payload) {
-        await enviarMensajeTelegram(chatId,
-            `👋 Hola <b>${nombre}</b>!\n\nPor favor accede al sistema para activar las notificaciones correctamente.`
-        );
-        continue;
-    }
+        if (!payload) {
+            await enviarMensajeTelegram(chatId,
+                `👋 Hola <b>${nombre}</b>!\n\nPor favor accede al sistema para activar las notificaciones correctamente.`
+            );
+            continue;
+        }
 
-    // La cédula siempre son 10 dígitos, separar por eso
-    // Formato: 1752222404-OuAUik_fumdsJv5ZDY_
-    const match = payload.match(/^(\d{10})-(.+)$/);
+        // ── ¿Es docente? ──────────────────────────────────
+        const esDocente = payload.startsWith('DOC-');
 
-    if (!match) {
-        console.error('❌ Payload no tiene formato válido:', payload);
-        await enviarMensajeTelegram(chatId,
-            `❌ Link de activación inválido. Por favor accede al sistema nuevamente.`
-        );
-        continue;
-    }
+        if (esDocente) {
+            // Formato: DOC-{cedula10digitos}-{cronogramaId}
+            const sinPrefijo = payload.slice(4); // quitar "DOC-"
+            const matchDoc   = sinPrefijo.match(/^(\d{10})-(.+)$/);
 
-    const cedula       = match[1]; // exactamente 10 dígitos
-    const cronogramaId = match[2]; // todo lo que sigue
+            if (!matchDoc) {
+                console.error('❌ Payload docente inválido:', payload);
+                await enviarMensajeTelegram(chatId,
+                    `❌ Link de activación inválido. Por favor accede al sistema nuevamente.`
+                );
+                continue;
+            }
 
-    console.log('✅ Registrando:', { cedula, cronogramaId, chatId });
+            const cedula       = matchDoc[1];
+            const cronogramaId = matchDoc[2];
 
-    const ok = await guardarChatId(cronogramaId, cedula, chatId);
+            console.log('👨‍🏫 Registrando docente:', { cedula, cronogramaId, chatId });
 
-    if (ok) {
-        await enviarMensajeTelegram(chatId,
-            `✅ <b>¡Listo, ${nombre}!</b>\n\n` +
-            `Ya estás suscrito a las notificaciones de tu cronograma académico.\n\n` +
-            `📅 Te avisaré cada vez que inicie una nueva actividad.\n\n` +
-            `<i>ITSQMET — Sistema de Cronogramas</i>`
-        );
-        console.log('✅ chatId guardado en Firebase para cédula:', cedula);
-    } else {
-        console.error('❌ Error guardando chatId en Firebase');
-        await enviarMensajeTelegram(chatId,
-            `❌ Hubo un error al activar las notificaciones.\n` +
-            `Por favor intenta de nuevo desde el sistema.`
-        );
-    }
-}
+            const ok = await guardarChatIdDocente(cronogramaId, cedula, chatId);
+
+            if (ok) {
+                await enviarMensajeTelegram(chatId,
+                    `✅ <b>¡Listo, ${nombre}!</b>\n\n` +
+                    `Ya estás suscrito a las notificaciones de tus cronogramas académicos.\n\n` +
+                    `📅 Te avisaré cada vez que inicie una nueva actividad.\n\n` +
+                    `<i>ITSOMET — Sistema de Cronogramas</i>`
+                );
+                console.log('✅ chatId docente guardado para cédula:', cedula);
+            } else {
+                await enviarMensajeTelegram(chatId,
+                    `❌ Hubo un error al activar las notificaciones.\n` +
+                    `Por favor intenta de nuevo desde el sistema.`
+                );
+            }
+
+        } else {
+            // ── Estudiante ────────────────────────────────
+            // Formato: {cedula10digitos}-{cronogramaId}
+            const matchEst = payload.match(/^(\d{10})-(.+)$/);
+
+            if (!matchEst) {
+                console.error('❌ Payload estudiante inválido:', payload);
+                await enviarMensajeTelegram(chatId,
+                    `❌ Link de activación inválido. Por favor accede al sistema nuevamente.`
+                );
+                continue;
+            }
+
+            const cedula       = matchEst[1];
+            const cronogramaId = matchEst[2];
+
+            console.log('🎓 Registrando estudiante:', { cedula, cronogramaId, chatId });
+
+            const ok = await guardarChatId(cronogramaId, cedula, chatId);
+
+            if (ok) {
+                await enviarMensajeTelegram(chatId,
+                    `✅ <b>¡Listo, ${nombre}!</b>\n\n` +
+                    `Ya estás suscrito a las notificaciones de tu cronograma académico.\n\n` +
+                    `📅 Te avisaré cada vez que inicie una nueva actividad.\n\n` +
+                    `<i>ITSOMET — Sistema de Cronogramas</i>`
+                );
+                console.log('✅ chatId estudiante guardado para cédula:', cedula);
+            } else {
+                await enviarMensajeTelegram(chatId,
+                    `❌ Hubo un error al activar las notificaciones.\n` +
+                    `Por favor intenta de nuevo desde el sistema.`
+                );
+            }
+        }
     }
 }
 
 // ── Revisar actividades de hoy y notificar ─────────────────
 export async function revisarYNotificar() {
-    const hoy = new Date();
+    const hoy    = new Date();
     hoy.setHours(0, 0, 0, 0);
-    const hoyStr = hoy.toISOString().split('T')[0]; // "YYYY-MM-DD"
+    const hoyStr = hoy.toISOString().split('T')[0];
 
     const cronogramas = await obtenerCronogramas();
 
     for (const crono of cronogramas) {
-        const estudiantes = crono.estudiantesVinculados ?? {};
-        const actividades = crono.actividades ?? [];
-
-        // Buscar actividades que inician HOY
+        const actividades    = crono.actividades ?? [];
         const actividadesHoy = actividades.filter(a => a.fechaInicio === hoyStr);
         if (actividadesHoy.length === 0) continue;
 
-        // Notificar a cada estudiante con chatId registrado
-        for (const [cedula, datos] of Object.entries(estudiantes)) {
-            const chatId  = datos.telegramChatId;
-            const activas = datos.notificacionesActivas;
-            if (!chatId || !activas) continue;
-
-            const nombreEst = datos.nombres ?? datos.nombre ?? 'Estudiante';
-
+        // Notificar estudiantes
+        const estudiantes = crono.estudiantesVinculados ?? {};
+        for (const [, datos] of Object.entries(estudiantes)) {
+            if (!datos.telegramChatId || !datos.notificacionesActivas) continue;
+            const nombreDest = datos.nombres ?? datos.nombre ?? 'Estudiante';
             for (const act of actividadesHoy) {
-                const mensaje =
-                    `📌 <b>Nueva actividad hoy</b>\n\n` +
-                    `Hola <b>${nombreEst}</b> 👋\n\n` +
-                    `<b>${act.actividad}</b>\n\n` +
-                    `📅 <b>Inicio:</b> ${formatFecha(act.fechaInicio)}\n` +
-                    `🏁 <b>Fin:</b>    ${formatFecha(act.fechaFin)}\n\n` +
-                    `📋 Cronograma: <i>${crono.nombre}</i>\n\n` +
-                    `<i>ITSQMET — Sistema de Cronogramas</i>`;
+                await enviarMensajeTelegram(datos.telegramChatId,
+                    mensajeActividad(nombreDest, act, crono.nombre)
+                );
+            }
+        }
 
-                await enviarMensajeTelegram(chatId, mensaje);
+        // Notificar docentes vinculados a este cronograma
+        const docentes = crono.docentesVinculados ?? {};
+        for (const [, datos] of Object.entries(docentes)) {
+            if (!datos.telegramChatId || !datos.notificacionesActivas) continue;
+            const nombreDest = datos.nombres ?? datos.nombre ?? 'Docente';
+            for (const act of actividadesHoy) {
+                await enviarMensajeTelegram(datos.telegramChatId,
+                    mensajeActividad(nombreDest, act, crono.nombre)
+                );
             }
         }
     }
+}
+
+// ── Plantilla de mensaje de actividad ─────────────────────
+function mensajeActividad(nombre, act, cronogramaNombre) {
+    return (
+        `📌 <b>Nueva actividad hoy</b>\n\n` +
+        `Hola <b>${nombre}</b> 👋\n\n` +
+        `<b>${act.actividad}</b>\n\n` +
+        `📅 <b>Inicio:</b> ${formatFecha(act.fechaInicio)}\n` +
+        `🏁 <b>Fin:</b>    ${formatFecha(act.fechaFin)}\n\n` +
+        `📋 Cronograma: <i>${cronogramaNombre ?? ''}</i>\n\n` +
+        `<i>ITSOMET — Sistema de Cronogramas</i>`
+    );
 }
 
 // ── Helper fecha legible ───────────────────────────────────
@@ -196,6 +277,10 @@ function formatFecha(fecha) {
 
 // ── Link de activación para el estudiante ─────────────────
 export function generarLinkActivacion(cedula, cronogramaId) {
-    const payload = `${cedula}-${cronogramaId}`;
-    return `https://t.me/${BOT_USERNAME}?start=${payload}`;
+    return `https://t.me/${BOT_USERNAME}?start=${cedula}-${cronogramaId}`;
+}
+
+// ── Link de activación para el docente ────────────────────
+export function generarLinkActivacionDocente(cedula, cronogramaId) {
+    return `https://t.me/${BOT_USERNAME}?start=DOC-${cedula}-${cronogramaId}`;
 }

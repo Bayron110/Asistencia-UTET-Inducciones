@@ -54,3 +54,8 @@ export function calcularEstado(fechaInicio, fechaFin) {
     if (hoy >= ini && hoy <= fin) return 'VIGENTE';
     return 'FINALIZADO';
 }
+export async function obtenerDocentePorCedula(cedula) {
+    const db = getDatabase(getApp('cronogramas'));
+    const snap = await get(ref(db, `docentes/${cedula}`));
+    return snap.exists() ? snap.val() : null;
+}

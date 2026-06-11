@@ -4,16 +4,43 @@
 // ─────────────────────────────────────────────────────────
 
 import { obtenerCronogramas } from '../../Firebase/cronograma.js';
+import { initializeApp, getApps }
+    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
+import { getDatabase, ref, get }
+    from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+
+// ── Firebase (misma app "cronogramas" donde viven los docentes) ──
+const firebaseConfig = {
+    apiKey:            'AIzaSyAl394v1xuNXxqkT6lEsiPQf74mFSIW6bw',
+    authDomain:        'cronogramas-estudiantes.firebaseapp.com',
+    databaseURL:       'https://cronogramas-estudiantes-default-rtdb.firebaseio.com',
+    projectId:         'cronogramas-estudiantes',
+    storageBucket:     'cronogramas-estudiantes.firebasestorage.app',
+    messagingSenderId: '1079875324500',
+    appId:             '1:1079875324500:web:d398c2ea7e224c2d1c7bc1'
+};
+
+const fbApp = getApps().find(a => a.name === 'cronogramas')
+    ?? initializeApp(firebaseConfig, 'cronogramas');
+
+const db = getDatabase(fbApp);
+
+// ── Leer docente maestro desde /docentes/{cedula} ──────────
+async function obtenerDocenteMaestro(cedula) {
+    try {
+        const snap = await get(ref(db, `docentes/${cedula}`));
+        return snap.exists() ? snap.val() : null;
+    } catch (e) {
+        console.error('Error leyendo docente maestro:', e);
+        return null;
+    }
+}
 
 // ── Reactor canvas ─────────────────────────────────────────
 function initReactor() {
-    // ── Video de fondo ──
     const video = document.getElementById('videoBg');
-    if (video) {
-        video.src = '../videos/Animación_Fondo.mp4';
-    }
+    if (video) video.src = '../videos/Animación_Fondo.mp4';
 
-    // ── Partículas ──
     const canvas = document.getElementById('particulasBg');
     if (!canvas) return;
     const ctx = canvas.getContext('2d');
@@ -100,7 +127,7 @@ function validarCedulaEcuatoriana(cedula) {
     if (!/^\d{10}$/.test(cedula)) return false;
     const provincia = parseInt(cedula.substring(0, 2));
     if (provincia < 1 || provincia > 24) return false;
-    const digitos = cedula.split('').map(Number);
+    const digitos     = cedula.split('').map(Number);
     const verificador = digitos[9];
     let suma = 0;
     for (let i = 0; i < 9; i++) {
@@ -134,15 +161,12 @@ function setLoading(on) {
 }
 
 // ── Búsqueda en Realtime Database ──────────────────────────
-// Devuelve { cronogramaId, nombre } o null si no encuentra.
-// ── Búsqueda en Realtime Database ──────────────────────────
-// Busca en estudiantesVinculados Y docentesVinculados
 async function buscarCronograma(cedula) {
     const cronogramas = await obtenerCronogramas();
 
-    // ── Buscar en estudiantes ──────────────────────────────
+    // ── Buscar como estudiante ─────────────────────────────
     const cronoEstudiante = cronogramas.find(c =>
-        c.estudiantesVinculados && c.estudiantesVinculados[cedula]
+        c.estudiantesVinculados?.[cedula]
     );
 
     if (cronoEstudiante) {
@@ -154,22 +178,30 @@ async function buscarCronograma(cedula) {
         };
     }
 
-    // ── Buscar en docentes ─────────────────────────────────
-    // El docente puede estar en varios cronogramas — buscamos el primero que lo tenga
+    // ── Buscar como docente ────────────────────────────────
     const cronoDocente = cronogramas.find(c =>
-        c.docentesVinculados && c.docentesVinculados[cedula]
+        c.docentesVinculados?.[cedula]
     );
 
     if (cronoDocente) {
-        const doc = cronoDocente.docentesVinculados[cedula];
-        // Los cronogramas asignados al docente están en cronogramasAsignados[]
-        const cronogramasAsignados = doc?.cronogramasAsignados ?? [cronoDocente.id];
+        const docRef = cronoDocente.docentesVinculados[cedula];
+
+        // Leer el nodo maestro /docentes/{cedula} para obtener
+        // la lista COMPLETA de cronogramasAsignados actualizada
+        const docenteMaestro = await obtenerDocenteMaestro(cedula);
+
+        // Firebase Realtime Database guarda arrays con keys numéricas
+        // como objeto { 0: "id1", 1: "id2" } — hay que convertirlo
+        const raw = docenteMaestro?.cronogramasAsignados;
+        const cronogramasAsignados =
+            Array.isArray(raw)             ? raw :
+            raw && typeof raw === 'object' ? Object.values(raw) :
+            [cronoDocente.id];
+
         return {
-            // Para docente mandamos el primer cronogramaId asignado
-            // (en cronograma.html luego se cargarán todos)
             cronogramaId:         cronogramasAsignados[0],
             cronogramasAsignados: cronogramasAsignados,
-            nombre: doc?.nombres ?? doc?.nombre ?? 'Docente',
+            nombre:               docenteMaestro?.nombres ?? docRef?.nombres ?? 'Docente',
             tipo:                 'docente'
         };
     }
@@ -192,13 +224,11 @@ function mostrarBienvenida(nombre, destino) {
     `;
     document.body.appendChild(overlay);
 
-    // Redirige cuando termina la barra (~3.2s total)
     setTimeout(() => {
         window.location.href = destino;
     }, 3200);
 }
 
-// ── Flujo principal ────────────────────────────────────────
 // ── Flujo principal ────────────────────────────────────────
 async function consultar() {
     const cedula = document.getElementById('inputCedula').value.trim();
@@ -217,11 +247,14 @@ async function consultar() {
             return;
         }
 
-        const params = new URLSearchParams({ cedula, cronogramaId: resultado.cronogramaId });
+        const params = new URLSearchParams({
+            cedula,
+            cronogramaId: resultado.cronogramaId
+        });
 
-        // Si es docente, pasamos todos sus cronogramas asignados
         if (resultado.tipo === 'docente') {
             params.set('tipo', 'docente');
+            // Todos los IDs separados por coma
             params.set('cronogramas', resultado.cronogramasAsignados.join(','));
         }
 
