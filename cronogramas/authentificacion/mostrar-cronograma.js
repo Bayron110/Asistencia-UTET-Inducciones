@@ -262,6 +262,7 @@ async function renderPanelEstudiante(cronogramaId) {
 
 // ── Panel docente ─────────────────────────────────────────────
 // ── Panel docente ─────────────────────────────────────────────
+// ── Panel docente ─────────────────────────────────────────────
 async function renderPanelDocente(cronogramaId) {
     const panel = document.getElementById('panelEstudiante'); // reutilizamos el mismo contenedor
     if (!panel) return;
@@ -274,29 +275,69 @@ async function renderPanelDocente(cronogramaId) {
     const nombre = docenteVinculado?.nombres ?? docenteVinculado?.nombre ?? 'Docente';
     const especialidad = docenteVinculado?.especialidad ?? docenteVinculado?.carrera ?? '';
 
-    // Datos globales del docente (telegramChatId / notificacionesActivas viven aquí)
+    // Datos globales del docente
     const docenteGlobal = await obtenerDocentePorCedula(PARAM_CEDULA);
 
-    // Cronogramas asignados al docente: derivados de TODA la lista,
-    // buscando en cuáles aparece su cédula dentro de docentesVinculados.
+    // Cronogramas asignados al docente
     const cronosDocente = obtenerCronogramasDelDocente(lista, PARAM_CEDULA);
     const totalCronos = cronosDocente.length;
 
-    // Actividades de todos sus cronogramas (para totales)
+    // Actividades de todos sus cronogramas
     const todasActividades = cronosDocente.flatMap(c =>
         (c.actividades ?? []).map(a => ({ ...a, cronogramaNombre: c.nombre ?? '' }))
     );
     const totalAct = todasActividades.length;
-    const hechas = todasActividades.filter(a => {
-        if (!a.fechaFin) return false;
-        return new Date(a.fechaFin + 'T23:59:59') < new Date();
-    }).length;
 
-    // ── Próxima actividad POR CADA cronograma asignado ─────────
-    const proximasPorCronograma = cronosDocente.map(c => ({
-        cronogramaNombre: c.nombre ?? 'Sin nombre',
-        actividad: siguienteActividad(c.actividades ?? [])
-    }));
+    // Próxima actividad POR CADA cronograma asignado (filtrando solo las que existen)
+    const proximasPorCronograma = cronosDocente
+        .map(c => ({
+            cronogramaNombre: c.nombre ?? 'Sin nombre',
+            actividad: siguienteActividad(c.actividades ?? [])
+        }))
+        .filter(p => p.actividad !== null); // Solo nos interesan las pendientes
+
+    // Determinar qué renderizar en la sección de próximas actividades
+    let htmlProximas = '';
+    
+    if (proximasPorCronograma.length === 0) {
+        htmlProximas = `
+            <div class="ep-proxima ep-proxima--done">
+                <i class="ti ti-circle-check"></i>
+                <span>Todas las actividades completadas</span>
+            </div>
+        `;
+    } else if (proximasPorCronograma.length === 1) {
+        // Si es solo una, se muestra directo para no forzar clicks innecesarios
+        const p = proximasPorCronograma[0];
+        htmlProximas = `
+            <div class="ep-proxima">
+                <div class="ep-proxima-label">
+                    <i class="ti ti-calendar-due"></i>
+                    Próxima actividad
+                    <span class="ep-proxima-crono">${p.cronogramaNombre}</span>
+                </div>
+                <div class="ep-proxima-nombre">${p.actividad.actividad}</div>
+                <div class="ep-proxima-fecha">
+                    <i class="ti ti-clock"></i>
+                    ${formatearFecha(p.actividad.fechaInicio)} → ${formatearFecha(p.actividad.fechaFin)}
+                </div>
+            </div>
+        `;
+    } else {
+        // SI HAY MÁS DE UNA, SE REEMPLAZA POR EL BOTÓN EN COINCIDENCIA CON TU SOLICITUD
+        htmlProximas = `
+            <div class="ep-proxima ep-proxima--multiple" style="border: 1px dashed #b0cef0; background: rgba(21, 101, 192, 0.05);">
+                <div class="ep-proxima-label" style="margin-bottom: 12px;">
+                    <i class="ti ti-calendar-event"></i>
+                    Múltiples actividades agendadas
+                </div>
+                <button class="btn-ver-detalle" id="btnVerMultiplesActividades" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
+                    <i class="ti ti-list-details"></i>
+                    Ver ${proximasPorCronograma.length} actividades próximas
+                </button>
+            </div>
+        `;
+    }
 
     panel.innerHTML = `
     <div class="ep-perfil">
@@ -339,69 +380,39 @@ async function renderPanelDocente(cronogramaId) {
     </div>
 
     <div class="ep-proximas-lista">
-        ${proximasPorCronograma.map(p => p.actividad ? `
-        <div class="ep-proxima">
-            <div class="ep-proxima-label">
-                <i class="ti ti-calendar-due"></i>
-                Próxima actividad
-                <span class="ep-proxima-crono">${p.cronogramaNombre}</span>
-            </div>
-            <div class="ep-proxima-nombre">${p.actividad.actividad}</div>
-            <div class="ep-proxima-fecha">
-                <i class="ti ti-clock"></i>
-                ${formatearFecha(p.actividad.fechaInicio)} → ${formatearFecha(p.actividad.fechaFin)}
-            </div>
-        </div>
-        ` : `
-        <div class="ep-proxima ep-proxima--done">
-            <i class="ti ti-circle-check"></i>
-            <span>${p.cronogramaNombre}: todas las actividades completadas</span>
-        </div>
-        `).join('')}
+        ${htmlProximas}
     </div>
-`;
+    `;
 
     panel.classList.remove('oculto');
-    const btnNotif = document.getElementById('btnNotificacionesDocente');
 
-    // ── notificaciones activas: ahora se lee del nodo global docentes/{cedula}
-    const yaActivo =
-        docenteGlobal?.notificacionesActivas &&
-        docenteGlobal?.telegramChatId;
+    // Listener para el nuevo botón de múltiples actividades
+    const btnMultiples = document.getElementById('btnVerMultiplesActividades');
+    if (btnMultiples) {
+        btnMultiples.addEventListener('click', () => {
+            abrirModalMultiplesDocente(proximasPorCronograma);
+        });
+    }
+
+    // ── Lógica de Notificaciones del Docente ──
+    const btnNotif = document.getElementById('btnNotificacionesDocente');
+    const yaActivo = docenteGlobal?.notificacionesActivas && docenteGlobal?.telegramChatId;
 
     if (btnNotif) {
-
         if (yaActivo) {
             btnNotif.classList.add('notif-activa');
-            btnNotif.innerHTML =
-                `<i class="ti ti-bell-check"></i><span>Notificaciones activas</span>`;
+            btnNotif.innerHTML = `<i class="ti ti-bell-check"></i><span>Notificaciones activas</span>`;
         }
 
         btnNotif.addEventListener('click', () => {
-
             if (yaActivo) return;
-
-            const esCelular =
-                /Android|iPhone|iPad/i.test(navigator.userAgent);
-
+            const esCelular = /Android|iPhone|iPad/i.test(navigator.userAgent);
             if (esCelular) {
-
-                const link =
-                    `https://t.me/${BOT_USERNAME}?start=DOC-${PARAM_CEDULA}-${cronogramaId}`;
-
+                const link = `https://t.me/${BOT_USERNAME}?start=DOC-${PARAM_CEDULA}-${cronogramaId}`;
                 window.open(link, '_blank', 'noopener,noreferrer');
-
-                mostrarToast(
-                    '📱 Presiona START en Telegram para activar notificaciones'
-                );
-
+                mostrarToast('📱 Presiona START en Telegram para activar notificaciones');
             } else {
-
-                mostrarModalInstruccionDocente(
-                    PARAM_CEDULA,
-                    cronogramaId
-                );
-
+                mostrarModalInstruccionDocente(PARAM_CEDULA, cronogramaId);
                 iniciarPollingDocente(cronogramaId);
             }
         });
@@ -466,15 +477,6 @@ function mostrarModalInstruccion(cedula, cronogramaId) {
                            text-decoration:none;font-weight:600;font-size:14px">
                     <span style="font-size:1.3rem">💻</span>
                     <span>Tengo Telegram instalado</span>
-                </a>
-                <a href="${linkTelegramWeb}" target="_blank" rel="noopener noreferrer"
-                    style="display:flex;align-items:center;gap:12px;
-                           background:#e3f0fb;color:#1565c0;
-                           border:1.5px solid #b0cef0;
-                           padding:13px 18px;border-radius:10px;
-                           text-decoration:none;font-weight:600;font-size:14px">
-                    <span style="font-size:1.3rem">🌐</span>
-                    <span>Usar Telegram Web</span>
                 </a>
             </div>
 
@@ -546,15 +548,7 @@ function mostrarModalInstruccionDocente(cedula, cronogramaId) {
                     <span style="font-size:1.3rem">💻</span>
                     <span>Tengo Telegram instalado</span>
                 </a>
-                <a href="${linkTelegramWeb}" target="_blank" rel="noopener noreferrer"
-                    style="display:flex;align-items:center;gap:12px;
-                           background:#e3f0fb;color:#1565c0;
-                           border:1.5px solid #b0cef0;
-                           padding:13px 18px;border-radius:10px;
-                           text-decoration:none;font-weight:600;font-size:14px">
-                    <span style="font-size:1.3rem">🌐</span>
-                    <span>Usar Telegram Web</span>
-                </a>
+
             </div>
 
             <div style="
@@ -778,3 +772,48 @@ document.addEventListener('DOMContentLoaded', () => {
         renderGrid(lista);
     });
 });
+
+// ── Modal de Múltiples Actividades (Docente) ──────────────────
+function abrirModalMultiplesDocente(proximasActividades) {
+    // Estilo adaptado al branding institucional azul oscuro del docente
+    document.getElementById('modalHeader').style.background = '#0a3d7c';
+    document.getElementById('modalHeader').style.color = '#ffffff';
+    document.getElementById('modalHeader').style.borderColor = '#030e28';
+    
+    document.getElementById('modalBadge').innerHTML = `<span class="badge vigente">Pendientes</span>`;
+    document.getElementById('modalNombre').textContent = 'Próximas Actividades del Docente';
+    document.getElementById('modalPeriodo').textContent = 'Resumen General';
+    
+    // Escondemos o limpiamos etiquetas de fechas únicas globales del modal original
+    document.getElementById('modalFechaInicio').textContent = '—';
+    document.getElementById('modalFechaFin').textContent = '—';
+    document.getElementById('modalFechaPublicacion').textContent = '—';
+
+    const tabla = document.getElementById('modalTabla');
+
+    tabla.innerHTML = `
+        <table class="modal-table">
+            <thead>
+                <tr>
+                    <th>Cronograma</th>
+                    <th>Actividad Pendiente</th>
+                    <th>Inicio</th>
+                    <th>Fin</th>
+                </tr>
+            </thead>
+            <tbody>
+                ${proximasActividades.map(p => `
+                    <tr>
+                        <td style="font-weight: bold; color: #1565c0;">${p.cronogramaNombre}</td>
+                        <td>${p.actividad.actividad}</td>
+                        <td class="td-fecha">${formatearFecha(p.actividad.fechaInicio)}</td>
+                        <td class="td-fecha">${formatearFecha(p.actividad.fechaFin)}</td>
+                    </tr>
+                `).join('')}
+            </tbody>
+        </table>
+    `;
+
+    document.getElementById('modalOverlay').classList.remove('oculto');
+    document.body.style.overflow = 'hidden';
+}
