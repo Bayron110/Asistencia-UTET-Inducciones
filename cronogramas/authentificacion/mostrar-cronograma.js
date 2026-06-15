@@ -324,19 +324,31 @@ async function renderPanelDocente(cronogramaId) {
             </div>
         `;
     } else {
-        // SI HAY MÁS DE UNA, SE REEMPLAZA POR EL BOTÓN EN COINCIDENCIA CON TU SOLICITUD
-        htmlProximas = `
-            <div class="ep-proxima ep-proxima--multiple" style="border: 1px dashed #b0cef0; background: rgba(21, 101, 192, 0.05);">
-                <div class="ep-proxima-label" style="margin-bottom: 12px;">
-                    <i class="ti ti-calendar-event"></i>
-                    Múltiples actividades agendadas
-                </div>
-                <button class="btn-ver-detalle" id="btnVerMultiplesActividades" style="width: 100%; display: flex; align-items: center; justify-content: center; gap: 8px;">
-                    <i class="ti ti-list-details"></i>
-                    Ver ${proximasPorCronograma.length} actividades próximas
-                </button>
-            </div>
-        `;
+// SI HAY MÁS DE UNA, SE REEMPLAZA POR EL BOTÓN EN COINCIDENCIA CON TU SOLICITUD
+htmlProximas = `
+    <div class="ep-proxima ep-proxima--multiple" style="border: 1px dashed #b0cef0; background: rgba(21, 101, 192, 0.05); border-radius: 12px; padding: 16px;">
+        <div class="ep-proxima-label" style="margin-bottom: 12px;">
+            <i class="ti ti-calendar-event"></i>
+            Múltiples actividades agendadas
+        </div>
+        ${
+          proximasPorCronograma.length > 1
+            ? `<button class="btn-ver-detalle" id="btnVerMultiplesActividades" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px;">
+                  <i class="ti ti-list-details"></i>
+                  Ver ${proximasPorCronograma.length} actividades próximas
+               </button>`
+            : `
+               <div style="display:flex; align-items:flex-start; gap:8px; font-size:12px;">
+                   <i class="ti ti-point-filled" style="color:#00e5ff; margin-top:3px; flex-shrink:0;"></i>
+                   <div>
+                       <span style="color:#94b8d8;">${proximasPorCronograma[0].actividad.actividad}</span>
+                       <span style="color:#546e8a; font-size:11px;"> — ${formatearFecha(proximasPorCronograma[0].actividad.fechaInicio)}</span>
+                   </div>
+               </div>`
+        }
+    </div>
+`;
+
     }
 
     panel.innerHTML = `
@@ -773,18 +785,14 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
-// ── Modal de Múltiples Actividades (Docente) ──────────────────
 function abrirModalMultiplesDocente(proximasActividades) {
-    // Estilo adaptado al branding institucional azul oscuro del docente
     document.getElementById('modalHeader').style.background = '#0a3d7c';
     document.getElementById('modalHeader').style.color = '#ffffff';
     document.getElementById('modalHeader').style.borderColor = '#030e28';
-    
+
     document.getElementById('modalBadge').innerHTML = `<span class="badge vigente">Pendientes</span>`;
-    document.getElementById('modalNombre').textContent = 'Próximas Actividades del Docente';
-    document.getElementById('modalPeriodo').textContent = 'Resumen General';
-    
-    // Escondemos o limpiamos etiquetas de fechas únicas globales del modal original
+    document.getElementById('modalNombre').textContent = 'Próximas Actividades';
+    document.getElementById('modalPeriodo').textContent = 'Resumen de todos tus cronogramas';
     document.getElementById('modalFechaInicio').textContent = '—';
     document.getElementById('modalFechaFin').textContent = '—';
     document.getElementById('modalFechaPublicacion').textContent = '—';
@@ -802,14 +810,28 @@ function abrirModalMultiplesDocente(proximasActividades) {
                 </tr>
             </thead>
             <tbody>
-                ${proximasActividades.map(p => `
-                    <tr>
-                        <td style="font-weight: bold; color: #1565c0;">${p.cronogramaNombre}</td>
-                        <td>${p.actividad.actividad}</td>
+                ${proximasActividades.map((p, i) => {
+                    const crono = todosLosCronogramas.find(c => c.nombre === p.cronogramaNombre);
+                    const periodo = crono?.periodo ?? '';
+                    const esHoy = p.actividad.fechaInicio === new Date().toISOString().split('T')[0];
+                    return `
+                    <tr style="${esHoy ? 'background: rgba(0,229,255,0.06);' : ''}">
+                        <td>
+                            <div style="font-weight:700; color:#1e88e5; line-height:1.3;">
+                                ${p.cronogramaNombre}
+                            </div>
+                            ${periodo ? `<div style="font-size:11px; color:#546e8a; margin-top:2px;">${periodo}</div>` : ''}
+                        </td>
+                        <td>
+                            <div style="display:flex; align-items:center; gap:6px;">
+                                ${esHoy ? '<span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#00e5ff; flex-shrink:0;"></span>' : ''}
+                                ${p.actividad.actividad}
+                            </div>
+                        </td>
                         <td class="td-fecha">${formatearFecha(p.actividad.fechaInicio)}</td>
                         <td class="td-fecha">${formatearFecha(p.actividad.fechaFin)}</td>
-                    </tr>
-                `).join('')}
+                    </tr>`;
+                }).join('')}
             </tbody>
         </table>
     `;
