@@ -488,7 +488,7 @@ function mostrarModalInstruccion(cedula, cronogramaId) {
                            padding:13px 18px;border-radius:10px;
                            text-decoration:none;font-weight:600;font-size:14px">
                     <span style="font-size:1.3rem">💻</span>
-                    <span>Tengo Telegram instalado</span>
+                    <span>Abrir Telegram</span>
                 </a>
             </div>
 
@@ -558,7 +558,7 @@ function mostrarModalInstruccionDocente(cedula, cronogramaId) {
                            padding:13px 18px;border-radius:10px;
                            text-decoration:none;font-weight:600;font-size:14px">
                     <span style="font-size:1.3rem">💻</span>
-                    <span>Tengo Telegram instalado</span>
+                    <span>Abrir Telegram</span>
                 </a>
 
             </div>
