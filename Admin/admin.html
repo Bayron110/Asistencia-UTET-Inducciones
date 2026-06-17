@@ -396,17 +396,37 @@
                 <path d="M10 13a5 5 0 0 0 7.07 0l2.83-2.83a5 5 0 0 0-7.07-7.07L11 4" />
                 <path d="M14 11a5 5 0 0 0-7.07 0L4.1 13.83a5 5 0 0 0 7.07 7.07L13 20" />
               </svg>
-              URL del formulario
+              URLs del sistema
             </div>
 
-            <p class="sesion-hint">
-              Comparte este enlace con los estudiantes para registrar asistencia.
+            <p class="sesion-hint">Comparte estos enlaces con los estudiantes.</p>
+
+            <!-- URL Asistencia -->
+            <p
+              style="font-size:12px;color:#94a3b8;margin:0 0 6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">
+              Formulario de asistencia
             </p>
-
-            <div class="url-box">
+            <div class="url-box" style="margin-bottom:20px;">
               <input type="text" id="formUrlInput" readonly value="https://registroinduccionesitsqmet.netlify.app/">
-
               <button class="action-btn action-btn--timer" id="copyUrlBtn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
+                  stroke-linejoin="round">
+                  <rect x="9" y="9" width="13" height="13" rx="2"></rect>
+                  <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                </svg>
+                Copiar URL
+              </button>
+            </div>
+
+            <!-- URL Cronogramas -->
+            <p
+              style="font-size:12px;color:#94a3b8;margin:0 0 6px;font-weight:600;text-transform:uppercase;letter-spacing:.05em;">
+              Portal de cronogramas
+            </p>
+            <div class="url-box">
+              <input type="text" id="cronoUrlInput" readonly
+                value="https://registroinduccionesitsqmet.netlify.app/cronogramas/vista/cedula-solicitud.html">
+              <button class="action-btn action-btn--timer" id="copyCronoUrlBtn">
                 <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round"
                   stroke-linejoin="round">
                   <rect x="9" y="9" width="13" height="13" rx="2"></rect>
@@ -760,40 +780,33 @@
       });
     }
   </script>
-  <script>
-    const copyUrlBtn = document.getElementById('copyUrlBtn');
-    const formUrlInput = document.getElementById('formUrlInput');
+ <script>
+    function setupCopyBtn(btnId, inputId) {
+        const btn   = document.getElementById(btnId);
+        const input = document.getElementById(inputId);
+        if (!btn || !input) return;
 
-    if (copyUrlBtn) {
-      copyUrlBtn.addEventListener('click', async () => {
-        try {
-          await navigator.clipboard.writeText(formUrlInput.value);
-
-          copyUrlBtn.innerHTML = `
-          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-            stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <polyline points="20 6 9 17 4 12"></polyline>
-          </svg>
-          ¡Copiado!
-        `;
-
-          setTimeout(() => {
-            copyUrlBtn.innerHTML = `
-            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
-              stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-              <rect x="9" y="9" width="13" height="13" rx="2"></rect>
-              <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
-            </svg>
-            Copiar URL
-          `;
-          }, 2000);
-
-        } catch (err) {
-          alert('No se pudo copiar la URL');
-        }
-      });
+        btn.addEventListener('click', async () => {
+            try {
+                await navigator.clipboard.writeText(input.value);
+                const original = btn.innerHTML;
+                btn.innerHTML = `
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    ¡Copiado!
+                `;
+                setTimeout(() => { btn.innerHTML = original; }, 2000);
+            } catch {
+                alert('No se pudo copiar la URL');
+            }
+        });
     }
-  </script>
+
+    setupCopyBtn('copyUrlBtn',      'formUrlInput');
+    setupCopyBtn('copyCronoUrlBtn', 'cronoUrlInput');
+</script>
   <script type="module" src="admin.js"></script>
 </body>
 

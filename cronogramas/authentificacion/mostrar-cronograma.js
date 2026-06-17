@@ -7,11 +7,12 @@ import { escucharCronogramas, calcularEstado, obtenerCronogramas, obtenerDocente
 import { generarLinkActivacion, procesarRegistros, revisarYNotificar } from '../notificaciones/notificacon-web.js';
 
 const BOT_USERNAME = 'itsometcronogramas_bot';
+const BACKEND_URL  = 'https://itsqmet-bot-backend.onrender.com';
 
-const urlParams = new URLSearchParams(window.location.search);
-const PARAM_CEDULA = urlParams.get('cedula');
+const urlParams    = new URLSearchParams(window.location.search);
+const PARAM_CEDULA   = urlParams.get('cedula');
 const PARAM_CRONO_ID = urlParams.get('cronogramaId');
-const PARAM_TIPO = urlParams.get('tipo') ?? 'estudiante'; // 'estudiante' | 'docente'
+const PARAM_TIPO     = urlParams.get('tipo') ?? 'estudiante';
 
 if (!PARAM_CEDULA || !PARAM_CRONO_ID) {
     window.location.replace('cedula-solicitud.html');
@@ -19,10 +20,7 @@ if (!PARAM_CEDULA || !PARAM_CRONO_ID) {
 
 const MODO_ESTUDIANTE = PARAM_TIPO !== 'docente';
 
-const videos = [
-    "../videos/Animación_Fondo.mp4"
-];
-
+const videos = ["../videos/Animación_Fondo.mp4"];
 const videoAleatorio = videos[Math.floor(Math.random() * videos.length)];
 document.getElementById("videoIzq").src = videoAleatorio;
 document.getElementById("videoDer").src = videoAleatorio;
@@ -53,7 +51,7 @@ function formatearFecha(fecha) {
 
 function badgeEstado(estado) {
     const cfg = {
-        VIGENTE: { label: 'Vigente', clase: 'vigente' },
+        VIGENTE:    { label: 'Vigente',    clase: 'vigente' },
         PROGRAMADO: { label: 'Programado', clase: 'programado' },
         FINALIZADO: { label: 'Finalizado', clase: 'finalizado' },
     };
@@ -67,20 +65,150 @@ function actividadFinalizada(fechaFin) {
     return new Date(fechaFin + 'T23:59:59') < hoy;
 }
 
-// ── Helper: cronogramas asignados a un docente ────────────────
-// Recorre TODA la lista de cronogramas y devuelve los que tienen
-// al docente (por cédula) registrado en docentesVinculados.
 function obtenerCronogramasDelDocente(lista, cedula) {
     return lista.filter(c => c.docentesVinculados?.[cedula]);
+}
+
+// ── Despertar backend con overlay bloqueante ──────────────────
+async function despertarBackend(accionAlDesperar) {
+    // Inyectar keyframe solo una vez
+    if (!document.getElementById('styleSpinBackend')) {
+        const style = document.createElement('style');
+        style.id = 'styleSpinBackend';
+        style.textContent = `@keyframes spinBackend { to { transform: rotate(360deg); } }`;
+        document.head.appendChild(style);
+    }
+
+    const overlay = document.createElement('div');
+    overlay.id = 'overlayDespertando';
+    overlay.style.cssText = `
+        position:fixed;inset:0;z-index:99999;
+        background:rgba(3,14,40,0.88);
+        backdrop-filter:blur(6px);
+        display:flex;flex-direction:column;
+        align-items:center;justify-content:center;
+        gap:20px;font-family:'DM Sans',sans-serif;
+    `;
+
+    const mostrarEspera = (texto = 'Iniciando servidor...') => {
+        overlay.innerHTML = `
+            <div style="
+                width:56px;height:56px;border-radius:50%;
+                border:3px solid rgba(0,229,255,0.2);
+                border-top-color:#00e5ff;
+                animation:spinBackend 0.9s linear infinite;
+            "></div>
+            <div style="text-align:center;">
+                <p style="color:#fff;font-size:16px;font-weight:600;margin:0 0 6px;">
+                    Conectando con el servidor
+                </p>
+                <p style="color:#7da5cc;font-size:13px;margin:0;">
+                    ${texto}
+                </p>
+            </div>
+        `;
+    };
+
+    mostrarEspera();
+    document.body.appendChild(overlay);
+
+    const MAX_INTENTOS = 5;
+    const TIMEOUT_MS   = 8000;
+
+    for (let i = 1; i <= MAX_INTENTOS; i++) {
+        mostrarEspera(i === 1 ? 'Esto puede tomar unos segundos...' : `Reintentando... (${i}/${MAX_INTENTOS})`);
+
+        try {
+            const res = await fetch(`${BACKEND_URL}/ping`, {
+                signal: AbortSignal.timeout(TIMEOUT_MS)
+            });
+
+            if (res.ok) {
+                // ✅ Servidor despierto — mostrar confirmación y ejecutar acción automáticamente
+                overlay.innerHTML = `
+                    <div style="
+                        width:56px;height:56px;border-radius:50%;
+                        background:rgba(0,229,255,0.1);
+                        border:2px solid #00e5ff;
+                        display:flex;align-items:center;justify-content:center;
+                        font-size:1.8rem;
+                    ">✅</div>
+                    <div style="text-align:center;">
+                        <p style="color:#fff;font-size:16px;font-weight:600;margin:0 0 6px;">
+                            Servidor listo
+                        </p>
+                        <p style="color:#7da5cc;font-size:13px;margin:0;">
+                            Abriendo Telegram...
+                        </p>
+                    </div>
+                `;
+                await new Promise(r => setTimeout(r, 800));
+                overlay.remove();
+                // ✅ Ejecutar la acción (abrir Telegram) automáticamente
+                accionAlDesperar();
+                return true;
+            }
+        } catch (e) {
+            console.warn(`Intento ${i} fallido:`, e);
+        }
+
+        if (i < MAX_INTENTOS) {
+            await new Promise(r => setTimeout(r, 1500));
+        }
+    }
+
+    // ❌ Todos los intentos fallaron
+    overlay.innerHTML = `
+        <div style="
+            background:#0d1f3c;border:1px solid #1e3a5f;
+            border-radius:16px;padding:32px 28px;max-width:360px;width:100%;
+            text-align:center;font-family:'DM Sans',sans-serif;
+        ">
+            <div style="font-size:2rem;margin-bottom:12px;">⚠️</div>
+            <p style="color:#fff;font-size:16px;font-weight:600;margin:0 0 8px;">
+                No se pudo conectar
+            </p>
+            <p style="color:#7da5cc;font-size:13px;margin:0 0 24px;">
+                El servidor tardó demasiado en responder. Puedes reintentar o continuar de todas formas.
+            </p>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+                <button id="btnReintentar" style="
+                    padding:12px;border-radius:10px;border:none;cursor:pointer;
+                    background:#00e5ff;color:#030e28;font-weight:700;
+                    font-family:'DM Sans',sans-serif;font-size:14px;
+                ">🔄 Reintentar</button>
+                <button id="btnContinuarIgual" style="
+                    padding:12px;border-radius:10px;cursor:pointer;
+                    background:transparent;color:#7da5cc;
+                    border:1.5px solid #1e3a5f;
+                    font-family:'DM Sans',sans-serif;font-size:13px;
+                ">Continuar de todas formas</button>
+            </div>
+        </div>
+    `;
+
+    return new Promise(resolve => {
+        document.getElementById('btnReintentar').addEventListener('click', async () => {
+            overlay.remove();
+            const ok = await despertarBackend(accionAlDesperar);
+            resolve(ok);
+        });
+        document.getElementById('btnContinuarIgual').addEventListener('click', () => {
+            overlay.remove();
+            // Continuar igualmente ejecuta la acción
+            accionAlDesperar();
+            resolve(false);
+        });
+    });
 }
 
 // ── Card ──────────────────────────────────────────────────────
 function crearCard(c) {
     const estado = calcularEstado(c.fechaInicio, c.fechaFin);
-    const total = c.actividades ? c.actividades.length : 0;
+    const total  = c.actividades ? c.actividades.length : 0;
 
     const card = document.createElement('div');
-    card.className = 'crono-card';
+    card.className  = 'crono-card';
     card.dataset.id = c.id;
 
     card.innerHTML = `
@@ -125,23 +253,20 @@ function filtrarLista(lista) {
     let resultado = lista;
 
     if (!MODO_ESTUDIANTE) {
-        // Docente: mostrar todos los cronogramas donde esté vinculado
         resultado = obtenerCronogramasDelDocente(resultado, PARAM_CEDULA);
-
         if (filtroActual !== 'TODOS') {
             resultado = resultado.filter(c =>
                 calcularEstado(c.fechaInicio, c.fechaFin) === filtroActual
             );
         }
     } else if (PARAM_CRONO_ID) {
-        // Estudiante: solo su cronograma
         resultado = resultado.filter(c => c.id === PARAM_CRONO_ID);
     }
 
     return resultado;
 }
 
-// ── Panel estudiante ──────────────────────────────────────────
+// ── Helpers panel ─────────────────────────────────────────────
 function siguienteActividad(actividades) {
     if (!actividades || actividades.length === 0) return null;
     const hoy = new Date(); hoy.setHours(0, 0, 0, 0);
@@ -154,13 +279,14 @@ function siguienteActividad(actividades) {
 function calcularPorcentaje(fechaInicio, fechaFin) {
     if (!fechaInicio || !fechaFin) return 0;
     const inicio = new Date(fechaInicio + 'T00:00:00').getTime();
-    const fin = new Date(fechaFin + 'T23:59:59').getTime();
-    const hoy = Date.now();
+    const fin    = new Date(fechaFin    + 'T23:59:59').getTime();
+    const hoy    = Date.now();
     if (hoy <= inicio) return 0;
-    if (hoy >= fin) return 100;
+    if (hoy >= fin)    return 100;
     return Math.round(((hoy - inicio) / (fin - inicio)) * 100);
 }
 
+// ── Panel estudiante ──────────────────────────────────────────
 async function renderPanelEstudiante(cronogramaId) {
     const panel = document.getElementById('panelEstudiante');
     if (!panel) return;
@@ -170,13 +296,13 @@ async function renderPanelEstudiante(cronogramaId) {
     if (!crono) return;
 
     const estudiante = crono.estudiantesVinculados?.[PARAM_CEDULA];
-    const nombre = estudiante?.nombres ?? estudiante?.nombre ?? 'Estudiante';
+    const nombre  = estudiante?.nombres ?? estudiante?.nombre ?? 'Estudiante';
     const carrera = estudiante?.carrera ?? '';
 
-    const pct = calcularPorcentaje(crono.fechaInicio, crono.fechaFin);
-    const proxAct = siguienteActividad(crono.actividades ?? []);
+    const pct      = calcularPorcentaje(crono.fechaInicio, crono.fechaFin);
+    const proxAct  = siguienteActividad(crono.actividades ?? []);
     const totalAct = crono.actividades?.length ?? 0;
-    const hechas = (crono.actividades ?? []).filter(a => {
+    const hechas   = (crono.actividades ?? []).filter(a => {
         if (!a.fechaFin) return false;
         return new Date(a.fechaFin + 'T23:59:59') < new Date();
     }).length;
@@ -193,8 +319,7 @@ async function renderPanelEstudiante(cronogramaId) {
         <div class="ep-progress-bloque">
             <div class="ep-progress-header">
                 <span class="ep-progress-label">
-                    <i class="ti ti-chart-line"></i>
-                    Progreso
+                    <i class="ti ti-chart-line"></i> Progreso
                 </span>
                 <span class="ep-progress-pct">${pct}%</span>
             </div>
@@ -217,8 +342,7 @@ async function renderPanelEstudiante(cronogramaId) {
         ${proxAct ? `
         <div class="ep-proxima">
             <div class="ep-proxima-label">
-                <i class="ti ti-calendar-due"></i>
-                Siguiente actividad
+                <i class="ti ti-calendar-due"></i> Siguiente actividad
             </div>
             <div class="ep-proxima-nombre">${proxAct.actividad}</div>
             <div class="ep-proxima-fecha">
@@ -236,8 +360,8 @@ async function renderPanelEstudiante(cronogramaId) {
 
     panel.classList.remove('oculto');
 
-    const btnNotif = document.getElementById('btnNotificaciones');
-    const yaActivo = estudiante?.notificacionesActivas && estudiante?.telegramChatId;
+    const btnNotif  = document.getElementById('btnNotificaciones');
+    const yaActivo  = estudiante?.notificacionesActivas && estudiante?.telegramChatId;
 
     if (btnNotif) {
         if (yaActivo) {
@@ -245,26 +369,30 @@ async function renderPanelEstudiante(cronogramaId) {
             btnNotif.innerHTML = `<i class="ti ti-bell-check"></i><span>Notificaciones activas</span>`;
         }
 
-        btnNotif.addEventListener('click', () => {
+        // ✅ Con despertarBackend bloqueante
+        btnNotif.addEventListener('click', async () => {
             if (yaActivo) return;
             const esCelular = /Android|iPhone|iPad/i.test(navigator.userAgent);
-            if (esCelular) {
-                const link = `https://t.me/${BOT_USERNAME}?start=${PARAM_CEDULA}-${cronogramaId}`;
-                window.open(link, '_blank', 'noopener,noreferrer');
-                mostrarToast('📱 Presiona START en Telegram para activar notificaciones');
-            } else {
-                mostrarModalInstruccion(PARAM_CEDULA, cronogramaId);
-                iniciarPolling(cronogramaId);
-            }
+
+            const accion = () => {
+                if (esCelular) {
+                    const link = `https://t.me/${BOT_USERNAME}?start=${PARAM_CEDULA}-${cronogramaId}`;
+                    window.open(link, '_blank', 'noopener,noreferrer');
+                    mostrarToast('📱 Presiona START en Telegram para activar notificaciones');
+                } else {
+                    mostrarModalInstruccion(PARAM_CEDULA, cronogramaId);
+                    iniciarPolling(cronogramaId);
+                }
+            };
+
+            await despertarBackend(accion);
         });
     }
 }
 
 // ── Panel docente ─────────────────────────────────────────────
-// ── Panel docente ─────────────────────────────────────────────
-// ── Panel docente ─────────────────────────────────────────────
 async function renderPanelDocente(cronogramaId) {
-    const panel = document.getElementById('panelEstudiante'); // reutilizamos el mismo contenedor
+    const panel = document.getElementById('panelEstudiante');
     if (!panel) return;
 
     const lista = await obtenerCronogramas();
@@ -272,33 +400,29 @@ async function renderPanelDocente(cronogramaId) {
     if (!crono) return;
 
     const docenteVinculado = crono.docentesVinculados?.[PARAM_CEDULA];
-    const nombre = docenteVinculado?.nombres ?? docenteVinculado?.nombre ?? 'Docente';
+    const nombre      = docenteVinculado?.nombres ?? docenteVinculado?.nombre ?? 'Docente';
     const especialidad = docenteVinculado?.especialidad ?? docenteVinculado?.carrera ?? '';
 
-    // Datos globales del docente
-    const docenteGlobal = await obtenerDocentePorCedula(PARAM_CEDULA);
+    const docenteGlobal  = await obtenerDocentePorCedula(PARAM_CEDULA);
+    const cronosDocente  = obtenerCronogramasDelDocente(lista, PARAM_CEDULA);
+    const totalCronos    = cronosDocente.length;
 
-    // Cronogramas asignados al docente
-    const cronosDocente = obtenerCronogramasDelDocente(lista, PARAM_CEDULA);
-    const totalCronos = cronosDocente.length;
-
-    // Actividades de todos sus cronogramas
     const todasActividades = cronosDocente.flatMap(c =>
         (c.actividades ?? []).map(a => ({ ...a, cronogramaNombre: c.nombre ?? '' }))
     );
     const totalAct = todasActividades.length;
 
-    // Próxima actividad POR CADA cronograma asignado (filtrando solo las que existen)
     const proximasPorCronograma = cronosDocente
         .map(c => ({
             cronogramaNombre: c.nombre ?? 'Sin nombre',
-            actividad: siguienteActividad(c.actividades ?? [])
+            periodo:          c.periodo ?? '',
+            actividad:        siguienteActividad(c.actividades ?? [])
         }))
-        .filter(p => p.actividad !== null); // Solo nos interesan las pendientes
+        .filter(p => p.actividad !== null);
 
-    // Determinar qué renderizar en la sección de próximas actividades
+    // ── HTML sección próximas ──────────────────────────────────
     let htmlProximas = '';
-    
+
     if (proximasPorCronograma.length === 0) {
         htmlProximas = `
             <div class="ep-proxima ep-proxima--done">
@@ -307,14 +431,13 @@ async function renderPanelDocente(cronogramaId) {
             </div>
         `;
     } else if (proximasPorCronograma.length === 1) {
-        // Si es solo una, se muestra directo para no forzar clicks innecesarios
         const p = proximasPorCronograma[0];
         htmlProximas = `
             <div class="ep-proxima">
                 <div class="ep-proxima-label">
                     <i class="ti ti-calendar-due"></i>
                     Próxima actividad
-                    <span class="ep-proxima-crono">${p.cronogramaNombre}</span>
+                    <span class="ep-proxima-crono">${p.cronogramaNombre}${p.periodo ? ' · ' + p.periodo : ''}</span>
                 </div>
                 <div class="ep-proxima-nombre">${p.actividad.actividad}</div>
                 <div class="ep-proxima-fecha">
@@ -324,31 +447,13 @@ async function renderPanelDocente(cronogramaId) {
             </div>
         `;
     } else {
-// SI HAY MÁS DE UNA, SE REEMPLAZA POR EL BOTÓN EN COINCIDENCIA CON TU SOLICITUD
-htmlProximas = `
-    <div class="ep-proxima ep-proxima--multiple" style="border: 1px dashed #b0cef0; background: rgba(21, 101, 192, 0.05); border-radius: 12px; padding: 16px;">
-        <div class="ep-proxima-label" style="margin-bottom: 12px;">
-            <i class="ti ti-calendar-event"></i>
-            Múltiples actividades agendadas
-        </div>
-        ${
-          proximasPorCronograma.length > 1
-            ? `<button class="btn-ver-detalle" id="btnVerMultiplesActividades" style="width:100%; display:flex; align-items:center; justify-content:center; gap:8px;">
-                  <i class="ti ti-list-details"></i>
-                  Ver ${proximasPorCronograma.length} actividades próximas
-               </button>`
-            : `
-               <div style="display:flex; align-items:flex-start; gap:8px; font-size:12px;">
-                   <i class="ti ti-point-filled" style="color:#00e5ff; margin-top:3px; flex-shrink:0;"></i>
-                   <div>
-                       <span style="color:#94b8d8;">${proximasPorCronograma[0].actividad.actividad}</span>
-                       <span style="color:#546e8a; font-size:11px;"> — ${formatearFecha(proximasPorCronograma[0].actividad.fechaInicio)}</span>
-                   </div>
-               </div>`
-        }
-    </div>
-`;
-
+        htmlProximas = `
+            <button class="btn-ver-detalle" id="btnVerMultiplesActividades"
+                style="width:100%;display:flex;align-items:center;justify-content:center;gap:8px;">
+                <i class="ti ti-list-details"></i>
+                Ver ${proximasPorCronograma.length} actividades próximas
+            </button>
+        `;
     }
 
     panel.innerHTML = `
@@ -358,9 +463,7 @@ htmlProximas = `
         </div>
         <div class="ep-info">
             <h2 class="ep-nombre">${nombre}</h2>
-            <span class="ep-rol-badge">
-                <i class="ti ti-id-badge-2"></i> Docente
-            </span>
+            <span class="ep-rol-badge"><i class="ti ti-id-badge-2"></i> Docente</span>
             ${especialidad ? `<span class="ep-carrera"><i class="ti ti-school"></i>${especialidad}</span>` : ''}
         </div>
     </div>
@@ -368,16 +471,13 @@ htmlProximas = `
     <div class="ep-progress-bloque">
         <div class="ep-progress-header">
             <span class="ep-progress-label">
-                <i class="ti ti-calendar-stats"></i>
-                Cronogramas asignados
+                <i class="ti ti-calendar-stats"></i> Cronogramas asignados
             </span>
             <span class="ep-progress-pct">${totalCronos}</span>
         </div>
-
         <div class="ep-barra-bg">
             <div class="ep-barra-fill" style="width:100%"></div>
         </div>
-
         <div class="ep-progress-sub">
             <span>${totalCronos} cronograma${totalCronos !== 1 ? 's' : ''}</span>
             <span>${totalAct} actividad${totalAct !== 1 ? 'es' : ''} en total</span>
@@ -398,7 +498,6 @@ htmlProximas = `
 
     panel.classList.remove('oculto');
 
-    // Listener para el nuevo botón de múltiples actividades
     const btnMultiples = document.getElementById('btnVerMultiplesActividades');
     if (btnMultiples) {
         btnMultiples.addEventListener('click', () => {
@@ -406,7 +505,6 @@ htmlProximas = `
         });
     }
 
-    // ── Lógica de Notificaciones del Docente ──
     const btnNotif = document.getElementById('btnNotificacionesDocente');
     const yaActivo = docenteGlobal?.notificacionesActivas && docenteGlobal?.telegramChatId;
 
@@ -416,17 +514,23 @@ htmlProximas = `
             btnNotif.innerHTML = `<i class="ti ti-bell-check"></i><span>Notificaciones activas</span>`;
         }
 
-        btnNotif.addEventListener('click', () => {
+        // ✅ Con despertarBackend bloqueante
+        btnNotif.addEventListener('click', async () => {
             if (yaActivo) return;
             const esCelular = /Android|iPhone|iPad/i.test(navigator.userAgent);
-            if (esCelular) {
-                const link = `https://t.me/${BOT_USERNAME}?start=DOC-${PARAM_CEDULA}-${cronogramaId}`;
-                window.open(link, '_blank', 'noopener,noreferrer');
-                mostrarToast('📱 Presiona START en Telegram para activar notificaciones');
-            } else {
-                mostrarModalInstruccionDocente(PARAM_CEDULA, cronogramaId);
-                iniciarPollingDocente(cronogramaId);
-            }
+
+            const accion = () => {
+                if (esCelular) {
+                    const link = `https://t.me/${BOT_USERNAME}?start=DOC-${PARAM_CEDULA}-${cronogramaId}`;
+                    window.open(link, '_blank', 'noopener,noreferrer');
+                    mostrarToast('📱 Presiona START en Telegram para activar notificaciones');
+                } else {
+                    mostrarModalInstruccionDocente(PARAM_CEDULA, cronogramaId);
+                    iniciarPollingDocente(cronogramaId);
+                }
+            };
+
+            await despertarBackend(accion);
         });
     }
 }
@@ -449,22 +553,20 @@ function mostrarToast(msg) {
     }, 5000);
 }
 
-// ── Modal instrucciones PC ────────────────────────────────────
+// ── Modal instrucciones estudiante ────────────────────────────
 function mostrarModalInstruccion(cedula, cronogramaId) {
     const existing = document.getElementById('modalInstruccion');
     if (existing) existing.remove();
 
-    const payload = `${cedula}-${cronogramaId}`;
+    const payload    = `${cedula}-${cronogramaId}`;
     const linkNativo = `https://t.me/${BOT_USERNAME}?start=${payload}`;
-    const linkTelegramWeb = `https://web.telegram.org/a/?tgaddr=tg%3A%2F%2Fresolve%3Fdomain%3D${BOT_USERNAME}%26start%3D${payload}`;
 
     const modal = document.createElement('div');
     modal.id = 'modalInstruccion';
     modal.style.cssText = `
         position:fixed;inset:0;background:rgba(3,14,40,0.70);
         display:flex;align-items:center;justify-content:center;
-        z-index:9999;padding:16px;
-        backdrop-filter:blur(4px);
+        z-index:9999;padding:16px;backdrop-filter:blur(4px);
     `;
     modal.innerHTML = `
         <div style="
@@ -478,9 +580,8 @@ function mostrarModalInstruccion(cedula, cronogramaId) {
                 Activar notificaciones
             </h3>
             <p style="color:#64748b;font-size:13px;margin-bottom:24px">
-                Elige cómo abrir Telegram:
+                Abre Telegram y presiona START para activar:
             </p>
-
             <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
                 <a href="${linkNativo}" target="_blank" rel="noopener noreferrer"
                     style="display:flex;align-items:center;gap:12px;
@@ -491,7 +592,6 @@ function mostrarModalInstruccion(cedula, cronogramaId) {
                     <span>Abrir Telegram</span>
                 </a>
             </div>
-
             <div style="
                 background:#f0f5fb;border-radius:10px;
                 padding:12px 14px;text-align:left;
@@ -503,7 +603,6 @@ function mostrarModalInstruccion(cedula, cronogramaId) {
                 2. El bot se abrirá automáticamente<br>
                 3. Presiona <b style="color:#0a3d7c">START</b>
             </div>
-
             <button id="btnCerrarInstruccion" style="
                 padding:9px 24px;background:transparent;
                 color:#64748b;border:1.5px solid #dde7f2;
@@ -518,23 +617,20 @@ function mostrarModalInstruccion(cedula, cronogramaId) {
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 }
 
+// ── Modal instrucciones docente ───────────────────────────────
 function mostrarModalInstruccionDocente(cedula, cronogramaId) {
-
     const existing = document.getElementById('modalInstruccion');
     if (existing) existing.remove();
 
-    // Payload correcto para docente
-    const payload        = `DOC-${cedula}-${cronogramaId}`;
-    const linkNativo     = `https://t.me/${BOT_USERNAME}?start=${payload}`;
-    const linkTelegramWeb = `https://web.telegram.org/a/?tgaddr=tg%3A%2F%2Fresolve%3Fdomain%3D${BOT_USERNAME}%26start%3D${payload}`;
+    const payload    = `DOC-${cedula}-${cronogramaId}`;
+    const linkNativo = `https://t.me/${BOT_USERNAME}?start=${payload}`;
 
     const modal = document.createElement('div');
     modal.id = 'modalInstruccion';
     modal.style.cssText = `
         position:fixed;inset:0;background:rgba(3,14,40,0.70);
         display:flex;align-items:center;justify-content:center;
-        z-index:9999;padding:16px;
-        backdrop-filter:blur(4px);
+        z-index:9999;padding:16px;backdrop-filter:blur(4px);
     `;
     modal.innerHTML = `
         <div style="
@@ -548,9 +644,8 @@ function mostrarModalInstruccionDocente(cedula, cronogramaId) {
                 Activar notificaciones
             </h3>
             <p style="color:#64748b;font-size:13px;margin-bottom:24px">
-                Elige cómo abrir Telegram:
+                Abre Telegram y presiona START para activar:
             </p>
-
             <div style="display:flex;flex-direction:column;gap:10px;margin-bottom:20px">
                 <a href="${linkNativo}" target="_blank" rel="noopener noreferrer"
                     style="display:flex;align-items:center;gap:12px;
@@ -560,9 +655,7 @@ function mostrarModalInstruccionDocente(cedula, cronogramaId) {
                     <span style="font-size:1.3rem">💻</span>
                     <span>Abrir Telegram</span>
                 </a>
-
             </div>
-
             <div style="
                 background:#f0f5fb;border-radius:10px;
                 padding:12px 14px;text-align:left;
@@ -574,7 +667,6 @@ function mostrarModalInstruccionDocente(cedula, cronogramaId) {
                 2. El bot se abrirá automáticamente<br>
                 3. Presiona <b style="color:#0a3d7c">START</b>
             </div>
-
             <button id="btnCerrarInstruccion" style="
                 padding:9px 24px;background:transparent;
                 color:#64748b;border:1.5px solid #dde7f2;
@@ -585,28 +677,22 @@ function mostrarModalInstruccionDocente(cedula, cronogramaId) {
     `;
 
     document.body.appendChild(modal);
-    document.getElementById('btnCerrarInstruccion')
-        .addEventListener('click', () => modal.remove());
+    document.getElementById('btnCerrarInstruccion').addEventListener('click', () => modal.remove());
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 }
 
+// ── Polling docente ───────────────────────────────────────────
 async function iniciarPollingDocente(cronogramaId) {
-
     if (pollingInterval) return;
-
     let intentos = 0;
 
     pollingInterval = setInterval(async () => {
-
         intentos++;
-
         await procesarRegistros();
 
-        // ── ahora se consulta el nodo global docentes/{cedula} ──
         const docenteGlobal = await obtenerDocentePorCedula(PARAM_CEDULA);
 
         if (docenteGlobal?.telegramChatId) {
-
             clearInterval(pollingInterval);
             pollingInterval = null;
 
@@ -615,7 +701,6 @@ async function iniciarPollingDocente(cronogramaId) {
                 btn.classList.add('notif-activa');
                 btn.innerHTML = `<i class="ti ti-bell-check"></i><span>Notificaciones activas</span>`;
             }
-
             mostrarToast('✅ ¡Notificaciones activadas correctamente!');
         }
 
@@ -623,25 +708,27 @@ async function iniciarPollingDocente(cronogramaId) {
             clearInterval(pollingInterval);
             pollingInterval = null;
         }
-
     }, 5000);
 }
-// ── Polling ───────────────────────────────────────────────────
+
+// ── Polling estudiante ────────────────────────────────────────
 let pollingInterval = null;
 function iniciarPolling(cronogramaId) {
     if (pollingInterval) return;
     let intentos = 0;
+
     pollingInterval = setInterval(async () => {
         intentos++;
         await procesarRegistros();
 
         const lista = await obtenerCronogramas();
         const crono = lista.find(c => c.id === cronogramaId);
-        const est = crono?.estudiantesVinculados?.[PARAM_CEDULA];
+        const est   = crono?.estudiantesVinculados?.[PARAM_CEDULA];
 
         if (est?.telegramChatId) {
             clearInterval(pollingInterval);
             pollingInterval = null;
+
             const btn = document.getElementById('btnNotificaciones');
             if (btn) {
                 btn.classList.add('notif-activa');
@@ -659,8 +746,8 @@ function iniciarPolling(cronogramaId) {
 
 // ── Grid ──────────────────────────────────────────────────────
 function renderGrid(lista) {
-    const grid = document.getElementById('gridCronogramas');
-    const vacia = document.getElementById('vistaVacia');
+    const grid     = document.getElementById('gridCronogramas');
+    const vacia    = document.getElementById('vistaVacia');
     const filtrados = filtrarLista(lista);
 
     grid.innerHTML = '';
@@ -683,20 +770,20 @@ function actualizarContador(n, filtro) {
     el.textContent = `${n} ${label}${n !== 1 ? 's' : ''} encontrado${n !== 1 ? 's' : ''}`;
 }
 
-// ── Modal detalle ─────────────────────────────────────────────
+// ── Modal detalle cronograma ──────────────────────────────────
 function abrirModal(c) {
     const estado = calcularEstado(c.fechaInicio, c.fechaFin);
 
-    document.getElementById('modalHeader').style.background = c.colorFondo ?? '#1565c0';
-    document.getElementById('modalHeader').style.color = c.colorTexto ?? '#ffffff';
+    document.getElementById('modalHeader').style.background  = c.colorFondo ?? '#1565c0';
+    document.getElementById('modalHeader').style.color       = c.colorTexto ?? '#ffffff';
     document.getElementById('modalHeader').style.borderColor = c.colorBorde ?? '#0d47a1';
-    document.getElementById('modalHeader').style.fontFamily = c.fuente ?? 'DM Sans, sans-serif';
+    document.getElementById('modalHeader').style.fontFamily  = c.fuente ?? 'DM Sans, sans-serif';
 
-    document.getElementById('modalBadge').innerHTML = badgeEstado(estado);
-    document.getElementById('modalNombre').textContent = c.nombre ?? '—';
-    document.getElementById('modalPeriodo').textContent = c.periodo ?? '—';
-    document.getElementById('modalFechaInicio').textContent = formatearFecha(c.fechaInicio);
-    document.getElementById('modalFechaFin').textContent = formatearFecha(c.fechaFin);
+    document.getElementById('modalBadge').innerHTML          = badgeEstado(estado);
+    document.getElementById('modalNombre').textContent       = c.nombre ?? '—';
+    document.getElementById('modalPeriodo').textContent      = c.periodo ?? '—';
+    document.getElementById('modalFechaInicio').textContent  = formatearFecha(c.fechaInicio);
+    document.getElementById('modalFechaFin').textContent     = formatearFecha(c.fechaFin);
     document.getElementById('modalFechaPublicacion').textContent = formatearFecha(c.fechaPublicacion);
 
     const actividades = c.actividades ?? [];
@@ -708,20 +795,15 @@ function abrirModal(c) {
         tabla.innerHTML = `
             <table class="modal-table">
                 <thead>
-                    <tr>
-                        <th>#</th>
-                        <th>Actividad</th>
-                        <th>Inicio</th>
-                        <th>Fin</th>
-                    </tr>
+                    <tr><th>#</th><th>Actividad</th><th>Inicio</th><th>Fin</th></tr>
                 </thead>
                 <tbody>
                     ${actividades.map((a, i) => `
                         <tr class="${actividadFinalizada(a.fechaFin) ? 'actividad-finalizada' : ''}">
                             <td class="td-num">
                                 ${actividadFinalizada(a.fechaFin)
-                ? '<i class="ti ti-check"></i>'
-                : i + 1}
+                                    ? '<i class="ti ti-check"></i>'
+                                    : i + 1}
                             </td>
                             <td>${a.actividad}</td>
                             <td class="td-fecha">${formatearFecha(a.fechaInicio)}</td>
@@ -742,7 +824,7 @@ function cerrarModal() {
     document.body.style.overflow = '';
 }
 
-// ── Filtros (solo modo docente/admin) ────────────────────────
+// ── Filtros (solo docente) ────────────────────────────────────
 function initFiltros() {
     if (MODO_ESTUDIANTE) {
         const filtrosEl = document.querySelector('.filtros');
@@ -774,7 +856,6 @@ document.addEventListener('DOMContentLoaded', () => {
     }
 
     document.getElementById('btnCerrarModal').addEventListener('click', cerrarModal);
-
     document.getElementById('modalOverlay').addEventListener('click', e => {
         if (e.target === e.currentTarget) cerrarModal();
     });
@@ -785,19 +866,21 @@ document.addEventListener('DOMContentLoaded', () => {
     });
 });
 
+// ── Modal múltiples actividades docente ───────────────────────
 function abrirModalMultiplesDocente(proximasActividades) {
-    document.getElementById('modalHeader').style.background = '#0a3d7c';
-    document.getElementById('modalHeader').style.color = '#ffffff';
+    document.getElementById('modalHeader').style.background  = '#0a3d7c';
+    document.getElementById('modalHeader').style.color       = '#ffffff';
     document.getElementById('modalHeader').style.borderColor = '#030e28';
 
-    document.getElementById('modalBadge').innerHTML = `<span class="badge vigente">Pendientes</span>`;
-    document.getElementById('modalNombre').textContent = 'Próximas Actividades';
-    document.getElementById('modalPeriodo').textContent = 'Resumen de todos tus cronogramas';
-    document.getElementById('modalFechaInicio').textContent = '—';
-    document.getElementById('modalFechaFin').textContent = '—';
+    document.getElementById('modalBadge').innerHTML              = `<span class="badge vigente">Pendientes</span>`;
+    document.getElementById('modalNombre').textContent           = 'Próximas Actividades';
+    document.getElementById('modalPeriodo').textContent          = 'Resumen de todos tus cronogramas';
+    document.getElementById('modalFechaInicio').textContent      = '—';
+    document.getElementById('modalFechaFin').textContent         = '—';
     document.getElementById('modalFechaPublicacion').textContent = '—';
 
-    const tabla = document.getElementById('modalTabla');
+    const hoyStr = new Date().toISOString().split('T')[0];
+    const tabla  = document.getElementById('modalTabla');
 
     tabla.innerHTML = `
         <table class="modal-table">
@@ -810,21 +893,19 @@ function abrirModalMultiplesDocente(proximasActividades) {
                 </tr>
             </thead>
             <tbody>
-                ${proximasActividades.map((p, i) => {
-                    const crono = todosLosCronogramas.find(c => c.nombre === p.cronogramaNombre);
-                    const periodo = crono?.periodo ?? '';
-                    const esHoy = p.actividad.fechaInicio === new Date().toISOString().split('T')[0];
+                ${proximasActividades.map(p => {
+                    const esHoy = p.actividad.fechaInicio === hoyStr;
                     return `
-                    <tr style="${esHoy ? 'background: rgba(0,229,255,0.06);' : ''}">
+                    <tr style="${esHoy ? 'background:rgba(0,229,255,0.06);' : ''}">
                         <td>
-                            <div style="font-weight:700; color:#1e88e5; line-height:1.3;">
+                            <div style="font-weight:700;color:#1e88e5;line-height:1.3;">
                                 ${p.cronogramaNombre}
                             </div>
-                            ${periodo ? `<div style="font-size:11px; color:#546e8a; margin-top:2px;">${periodo}</div>` : ''}
+                            ${p.periodo ? `<div style="font-size:11px;color:#546e8a;margin-top:2px;">${p.periodo}</div>` : ''}
                         </td>
                         <td>
-                            <div style="display:flex; align-items:center; gap:6px;">
-                                ${esHoy ? '<span style="display:inline-block; width:7px; height:7px; border-radius:50%; background:#00e5ff; flex-shrink:0;"></span>' : ''}
+                            <div style="display:flex;align-items:center;gap:6px;">
+                                ${esHoy ? '<span style="display:inline-block;width:7px;height:7px;border-radius:50%;background:#00e5ff;flex-shrink:0;"></span>' : ''}
                                 ${p.actividad.actividad}
                             </div>
                         </td>
