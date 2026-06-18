@@ -15,12 +15,13 @@ import {
   db as gruposDb,
   ref as gruposRef,
   set as gruposSet,
+  update as gruposUpdate,
   onValue as gruposOnValue
 } from '../../Firebase/Inducciones-Grupos.js';
 
 const DB_ADMIN_ESTUDIANTES = 'admin_estudiantes';
-const DB_ASIST = 'asistencias';
-const DB_GRUPOS = 'grupos';
+const DB_ASIST             = 'asistencias';
+const DB_GRUPOS            = 'grupos';
 
 const $ = id => document.getElementById(id);
 
@@ -197,6 +198,113 @@ function injectGruposStyles() {
       flex-shrink: 0; display: inline-block; margin-right: 4px;
       vertical-align: middle;
     }
+
+    /* ══ BARRA DE ACCIONES DEL GRUPO (Excel + info) ══ */
+    .grupo-action-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      flex-wrap: wrap;
+      gap: 10px;
+      padding: 14px 0 4px;
+    }
+    .grupo-action-bar__info {
+      font-size: .75rem;
+      color: #475569;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+    .grupo-action-bar__info svg { width: 13px; height: 13px; flex-shrink: 0; }
+
+    /* ── Botón descargar Excel ── */
+    .btn-dl-excel {
+      display: inline-flex;
+      align-items: center;
+      gap: 7px;
+      padding: 7px 16px;
+      border-radius: 9px;
+      border: 1px solid rgba(74,222,128,.25);
+      background: rgba(74,222,128,.07);
+      color: #4ade80;
+      font-size: .75rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+    }
+    .btn-dl-excel:hover {
+      background: rgba(74,222,128,.14);
+      border-color: rgba(74,222,128,.45);
+      transform: translateY(-1px);
+    }
+    .btn-dl-excel svg { width: 14px; height: 14px; }
+
+    /* ══ BOTÓN TOGGLE ASISTENCIA en tabla ══ */
+    .btn-toggle-asist {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      padding: 4px 11px;
+      border-radius: 6px;
+      border: 1px solid transparent;
+      font-size: .7rem;
+      font-weight: 600;
+      font-family: inherit;
+      cursor: pointer;
+      transition: all .15s;
+      white-space: nowrap;
+      min-width: 96px;
+      justify-content: center;
+    }
+    .btn-toggle-asist svg { width: 11px; height: 11px; flex-shrink: 0; }
+
+    /* Estado: Presente → click para marcar Ausente */
+    .btn-toggle-asist--presente {
+      background: rgba(74,222,128,.1);
+      border-color: rgba(74,222,128,.3);
+      color: #4ade80;
+    }
+    .btn-toggle-asist--presente:hover {
+      background: rgba(248,113,113,.1);
+      border-color: rgba(248,113,113,.35);
+      color: #f87171;
+    }
+    .btn-toggle-asist--presente:hover .asist-icon--present { display: none; }
+    .btn-toggle-asist--presente:hover .asist-icon--remove  { display: inline; }
+    .btn-toggle-asist--presente:hover .asist-label         { }
+
+    /* Estado: Ausente → click para marcar Presente */
+    .btn-toggle-asist--ausente {
+      background: rgba(248,113,113,.08);
+      border-color: rgba(248,113,113,.25);
+      color: #f87171;
+    }
+    .btn-toggle-asist--ausente:hover {
+      background: rgba(74,222,128,.1);
+      border-color: rgba(74,222,128,.3);
+      color: #4ade80;
+    }
+
+    /* Ocultar/mostrar íconos según estado hover */
+    .asist-icon--remove  { display: none; }
+
+    /* Spinner mientras guarda */
+    .btn-toggle-asist--loading {
+      opacity: .6;
+      pointer-events: none;
+      cursor: not-allowed;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+    .asist-spinner {
+      width: 11px; height: 11px;
+      border: 2px solid currentColor;
+      border-top-color: transparent;
+      border-radius: 50%;
+      animation: spin .6s linear infinite;
+      display: inline-block;
+    }
   `;
   document.head.appendChild(style);
 }
@@ -224,7 +332,11 @@ function toast(msg, type = 'info') {
   t.className = `toast toast--${type}`;
   t.innerHTML = (icons[type] || '') + `<span>${escHtml(msg)}</span>`;
   toastContainer.appendChild(t);
-  setTimeout(() => { t.style.transition = 'opacity .3s'; t.style.opacity = '0'; setTimeout(() => t.remove(), 300); }, 3500);
+  setTimeout(() => {
+    t.style.transition = 'opacity .3s';
+    t.style.opacity = '0';
+    setTimeout(() => t.remove(), 300);
+  }, 3500);
 }
 
 function rawToCedula(v) {
@@ -244,7 +356,6 @@ function normalizeHeader(v) {
   return String(v || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').trim().toLowerCase();
 }
 
-/* Normaliza un string para comparaciones insensibles a tildes y ñ */
 function normalizeStr(v) {
   return String(v || '')
     .normalize('NFD')
@@ -270,19 +381,153 @@ function configurarExcelGrupos(opciones = {}) {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   DESCARGA EXCEL POR GRUPO
+══════════════════════════════════════════════════════════════ */
+
+function descargarExcelGrupo(grupoKey) {
+  if (typeof XLSX === 'undefined') {
+    toast('Librería XLSX no disponible.', 'error');
+    return;
+  }
+
+  const grupo = gruposData[grupoKey];
+  if (!grupo) { toast('Grupo no encontrado.', 'error'); return; }
+
+  const estudiantes = grupo.estudiantes || {};
+  const entries     = Object.entries(estudiantes);
+
+  if (!entries.length) { toast('Este grupo no tiene estudiantes.', 'warn'); return; }
+
+  /* ── Construir filas ── */
+  const filas = entries.map(([cedula, d], i) => ({
+    '#':          i + 1,
+    'Cédula':     cedula,
+    'Nombres':    d.nombres || '',
+    'Carrera':    d.carrera  || '',
+    'Telegram':   d.telegram || '',
+    'Asistencia': d.asistencia ? 'Presente' : 'Ausente'
+  }));
+
+  /* ── Hoja de resumen ── */
+  const total      = entries.length;
+  const asistieron = entries.filter(([, d]) => d.asistencia).length;
+  const ausentes   = total - asistieron;
+  const pct        = total > 0 ? ((asistieron / total) * 100).toFixed(1) : '0.0';
+
+  const resumen = [
+    { 'Campo': 'Grupo',             'Valor': grupo.nombre || grupoKey },
+    { 'Campo': 'Fecha de creación', 'Valor': new Date(grupo.creadoEn || 0).toLocaleString('es-EC') },
+    { 'Campo': 'Total estudiantes', 'Valor': total },
+    { 'Campo': 'Asistieron',        'Valor': asistieron },
+    { 'Campo': 'Ausentes',          'Valor': ausentes },
+    { 'Campo': '% Asistencia',      'Valor': `${pct}%` }
+  ];
+
+  /* ── Crear workbook ── */
+  const wb = XLSX.utils.book_new();
+
+  const wsEstudiantes = XLSX.utils.json_to_sheet(filas);
+  /* Anchos de columna */
+  wsEstudiantes['!cols'] = [
+    { wch: 5 },  /* # */
+    { wch: 14 }, /* Cédula */
+    { wch: 34 }, /* Nombres */
+    { wch: 30 }, /* Carrera */
+    { wch: 20 }, /* Telegram */
+    { wch: 12 }  /* Asistencia */
+  ];
+  XLSX.utils.book_append_sheet(wb, wsEstudiantes, 'Estudiantes');
+
+  const wsResumen = XLSX.utils.json_to_sheet(resumen);
+  wsResumen['!cols'] = [{ wch: 22 }, { wch: 36 }];
+  XLSX.utils.book_append_sheet(wb, wsResumen, 'Resumen');
+
+  /* ── Nombre del archivo ── */
+  const nombreLimpio = (grupo.nombre || grupoKey)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_\-]/g, '')
+    .substring(0, 60);
+
+  XLSX.writeFile(wb, `${nombreLimpio}.xlsx`);
+  toast(`Excel "${grupo.nombre || grupoKey}" descargado.`, 'success');
+}
+
+/* ══════════════════════════════════════════════════════════════
+   TOGGLE ASISTENCIA MANUAL
+══════════════════════════════════════════════════════════════ */
+
+async function toggleAsistenciaEstudiante(grupoKey, cedula, btnEl) {
+  const grupo = gruposData[grupoKey];
+  if (!grupo) return;
+
+  const est = grupo.estudiantes?.[cedula];
+  if (!est) return;
+
+  const nuevoEstado = !est.asistencia;
+
+  /* Estado visual: loading */
+  btnEl.classList.add('btn-toggle-asist--loading');
+  btnEl.innerHTML = `<span class="asist-spinner"></span> Guardando…`;
+
+  try {
+    await gruposUpdate(
+      gruposRef(gruposDb, `${DB_GRUPOS}/${grupoKey}/estudiantes/${cedula}`),
+      { asistencia: nuevoEstado }
+    );
+    /* gruposData se actualiza vía onValue; el render ocurre automáticamente */
+  } catch (err) {
+    console.error(err);
+    toast('No se pudo actualizar la asistencia.', 'error');
+    /* Revertir botón */
+    actualizarBtnToggle(btnEl, est.asistencia);
+    btnEl.classList.remove('btn-toggle-asist--loading');
+  }
+}
+
+/* Actualiza el aspecto visual del botón según el estado */
+function actualizarBtnToggle(btn, asistencia) {
+  if (asistencia) {
+    btn.className = 'btn-toggle-asist btn-toggle-asist--presente';
+    btn.innerHTML = `
+      <svg class="asist-icon--present" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <path d="M20 6L9 17l-5-5"/>
+      </svg>
+      <svg class="asist-icon--remove" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+        <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+      </svg>
+      <span class="asist-label">Presente</span>`;
+  } else {
+    btn.className = 'btn-toggle-asist btn-toggle-asist--ausente';
+    btn.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+        stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+        <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+      </svg>
+      <span class="asist-label">Ausente</span>`;
+  }
+}
+
+/* ══════════════════════════════════════════════════════════════
    EXCEL
 ══════════════════════════════════════════════════════════════ */
 
 function handleExcelFileChange() {
   const file = excelFileInput?.files?.[0];
-  if (!file) { if (excelSelectedInfo) excelSelectedInfo.textContent = 'Ningún archivo seleccionado.'; return; }
+  if (!file) {
+    if (excelSelectedInfo) excelSelectedInfo.textContent = 'Ningún archivo seleccionado.';
+    return;
+  }
   if (!/\.(xls|xlsx)$/i.test(file.name)) {
     excelFileInput.value = '';
     if (excelSelectedInfo) excelSelectedInfo.textContent = 'Archivo inválido.';
-    toast('Solo se permiten archivos .xls o .xlsx', 'warn'); return;
+    toast('Solo se permiten archivos .xls o .xlsx', 'warn');
+    return;
   }
   if (excelSelectedInfo) excelSelectedInfo.textContent = `Archivo seleccionado: ${file.name}`;
-  excelState.file = file; excelState.fileName = file.name;
+  excelState.file = file;
+  excelState.fileName = file.name;
 }
 
 function openExcelReview() {
@@ -310,8 +555,12 @@ function openExcelReview() {
           carrera: suggestHeader(headers, ['carrera','programa','especialidad','curso'])
         }
       };
-      fillExcelModal(); showExcelModal();
-    } catch (error) { console.error(error); toast('No se pudo leer el archivo Excel.', 'error'); }
+      fillExcelModal();
+      showExcelModal();
+    } catch (error) {
+      console.error(error);
+      toast('No se pudo leer el archivo Excel.', 'error');
+    }
   };
   reader.readAsArrayBuffer(file);
 }
@@ -320,7 +569,9 @@ function fillExcelModal() {
   if (excelFileName)  excelFileName.textContent  = excelState.fileName  || '—';
   if (excelSheetName) excelSheetName.textContent = excelState.sheetName || '—';
   if (excelRowCount)  excelRowCount.textContent  = String(excelState.rows.length || 0);
-  renderHeaders(); renderMappingSelects(); renderPreviewTable();
+  renderHeaders();
+  renderMappingSelects();
+  renderPreviewTable();
 }
 
 function renderHeaders() {
@@ -359,11 +610,19 @@ function renderPreviewTable() {
   excelPreviewHead.innerHTML = '';
   excelPreviewBody.innerHTML = '';
   const headRow = document.createElement('tr');
-  headers.forEach(h => { const th = document.createElement('th'); th.textContent = h; headRow.appendChild(th); });
+  headers.forEach(h => {
+    const th = document.createElement('th');
+    th.textContent = h;
+    headRow.appendChild(th);
+  });
   excelPreviewHead.appendChild(headRow);
   previewRows.forEach(row => {
     const tr = document.createElement('tr');
-    headers.forEach(h => { const td = document.createElement('td'); td.textContent = row[h] ?? ''; tr.appendChild(td); });
+    headers.forEach(h => {
+      const td = document.createElement('td');
+      td.textContent = row[h] ?? '';
+      tr.appendChild(td);
+    });
     excelPreviewBody.appendChild(tr);
   });
 }
@@ -392,7 +651,10 @@ async function prepararCargaExcel() {
     await adminSet(adminRef(adminDb, DB_ADMIN_ESTUDIANTES), registrosLimpios);
     toast(`Se importaron ${totalValidos} registros correctamente.`, 'success');
     closeExcelModal();
-  } catch (error) { console.error(error); toast('No se pudo guardar la información en la base admin.', 'error'); }
+  } catch (error) {
+    console.error(error);
+    toast('No se pudo guardar la información en la base admin.', 'error');
+  }
 }
 
 /* ══════════════════════════════════════════════════════════════
@@ -407,15 +669,20 @@ function openGrupoModal() {
   setTimeout(() => grupoNombreInput?.focus(), 100);
 }
 
-function closeGrupoModal() { if (grupoModalBackdrop) grupoModalBackdrop.style.display = 'none'; }
+function closeGrupoModal() {
+  if (grupoModalBackdrop) grupoModalBackdrop.style.display = 'none';
+}
 
 async function confirmarMigracionGrupo() {
   const nombre    = grupoNombreInput?.value?.trim();
   const registros = obtenerRegistrosActuales();
-  if (!nombre)                            { toast('Ingresa un nombre para el grupo.', 'warn'); grupoNombreInput?.focus(); return; }
-  if (!Object.keys(registros).length)     { toast('No hay registros para migrar.', 'warn'); return; }
+  if (!nombre)                        { toast('Ingresa un nombre para el grupo.', 'warn'); grupoNombreInput?.focus(); return; }
+  if (!Object.keys(registros).length) { toast('No hay registros para migrar.', 'warn'); return; }
 
-  if (confirmarGrupoBtn) { confirmarGrupoBtn.disabled = true; confirmarGrupoBtn.textContent = 'Migrando…'; }
+  if (confirmarGrupoBtn) {
+    confirmarGrupoBtn.disabled = true;
+    confirmarGrupoBtn.textContent = 'Migrando…';
+  }
 
   try {
     const grupoKey = nombre
@@ -424,10 +691,22 @@ async function confirmarMigracionGrupo() {
 
     const estudiantes = {};
     for (const [cedula, d] of Object.entries(registros)) {
-      estudiantes[cedula] = { cedula, nombres: d.nombre || d.nombres || '', carrera: d.carrera || '', telegram: d.telegram || '', asistencia: d.asistencia === true };
+      estudiantes[cedula] = {
+        cedula,
+        nombres:    d.nombre || d.nombres || '',
+        carrera:    d.carrera  || '',
+        telegram:   d.telegram || '',
+        asistencia: d.asistencia === true
+      };
     }
 
-    const grupoPayload = { nombre, creadoEn: Date.now(), totalEstudiantes: Object.keys(estudiantes).length, estudiantes };
+    const grupoPayload = {
+      nombre,
+      creadoEn:        Date.now(),
+      totalEstudiantes: Object.keys(estudiantes).length,
+      estudiantes
+    };
+
     await gruposSet(gruposRef(gruposDb, `${DB_GRUPOS}/${grupoKey}`), grupoPayload);
     await userRemove(userRef(userDb, DB_ASIST));
     await adminRemove(adminRef(adminDb, DB_ADMIN_ESTUDIANTES));
@@ -440,11 +719,16 @@ async function confirmarMigracionGrupo() {
     const gruposNav = document.querySelector('[data-tab="grupos"]');
     if (gruposNav) gruposNav.click();
   } catch (err) {
-    console.error(err); toast('Error al migrar. Revisa la consola.', 'error');
+    console.error(err);
+    toast('Error al migrar. Revisa la consola.', 'error');
   } finally {
     if (confirmarGrupoBtn) {
       confirmarGrupoBtn.disabled = false;
-      confirmarGrupoBtn.innerHTML = `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><path d="M5 12h14M12 5l7 7-7 7"/></svg>Crear grupo`;
+      confirmarGrupoBtn.innerHTML = `
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M5 12h14M12 5l7 7-7 7"/>
+        </svg>Crear grupo`;
     }
   }
 }
@@ -456,7 +740,6 @@ async function confirmarMigracionGrupo() {
 function calcCarrerasGrupo(estudiantes) {
   const map = {};
   Object.values(estudiantes).forEach(e => {
-    /* Clave normalizada para comparar, pero guardamos el nombre original para mostrar */
     const raw  = (e.carrera || 'Sin carrera').trim();
     const norm = normalizeStr(raw);
     if (!map[norm]) map[norm] = { total: 0, presentes: 0, nombre: raw };
@@ -487,7 +770,9 @@ function aplicarFiltrosGrupo(key, estudiantes) {
   let entries = Object.entries(estudiantes);
 
   if (carrera !== 'todas') {
-    entries = entries.filter(([, d]) => normalizeStr(d.carrera || 'Sin carrera') === normalizeStr(carrera));
+    entries = entries.filter(([, d]) =>
+      normalizeStr(d.carrera || 'Sin carrera') === normalizeStr(carrera)
+    );
   }
 
   if (query) {
@@ -517,22 +802,42 @@ function aplicarFiltrosGrupo(key, estudiantes) {
       <td>${escHtml(d.carrera || '')}</td>
       <td class="badge-telegram">${escHtml(d.telegram || '—')}</td>
       <td>
-        <span class="${d.asistencia ? 'tag-asistencia-ok' : 'tag-asistencia-no'}">
-          ${d.asistencia ? 'Presente' : 'Ausente'}
-        </span>
+        <button
+          class="btn-toggle-asist ${d.asistencia ? 'btn-toggle-asist--presente' : 'btn-toggle-asist--ausente'}"
+          data-grupo-key="${escHtml(key)}"
+          data-cedula="${escHtml(ced)}"
+          title="${d.asistencia ? 'Click para marcar ausente' : 'Click para marcar presente'}"
+        >
+          ${d.asistencia
+            ? `<svg class="asist-icon--present" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 6L9 17l-5-5"/></svg>
+               <svg class="asist-icon--remove" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+               </svg>
+               <span class="asist-label">Presente</span>`
+            : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+               </svg>
+               <span class="asist-label">Ausente</span>`
+          }
+        </button>
       </td>
     </tr>
   `).join('');
+
+  /* Bind toggle buttons recién renderizados */
+  bindToggleAsistenciaEnContenedor(tableContainer, key);
 }
 
 /* ══════════════════════════════════════════════════════════════
    PANEL DE CARRERAS — GRID DE TARJETAS
-   Cada carrera ocupa su propia tarjeta con nombre completo,
-   barra de progreso, porcentaje y conteo de presentes/total.
 ══════════════════════════════════════════════════════════════ */
 
 function buildCarrerasPanel(key, estudiantes) {
-  const map = calcCarrerasGrupo(estudiantes);
+  const map     = calcCarrerasGrupo(estudiantes);
   const carreras = Object.entries(map).sort((a, b) => {
     const pA = a[1].total > 0 ? (a[1].presentes / a[1].total) : 0;
     const pB = b[1].total > 0 ? (b[1].presentes / b[1].total) : 0;
@@ -541,9 +846,6 @@ function buildCarrerasPanel(key, estudiantes) {
 
   if (!carreras.length) return '';
 
-  /* ─── tarjetas de carrera ───
-     normKey  = clave normalizada (sin tildes/ñ) usada en data-carrera para filtrar
-     d.nombre = nombre original del Excel, con tildes y ñ correctas, para mostrar */
   const cardsHtml = carreras.map(([normKey, d]) => {
     const pct           = d.total > 0 ? Math.round((d.presentes / d.total) * 100) : 0;
     const col           = colorPct(pct);
@@ -586,14 +888,13 @@ function buildCarrerasPanel(key, estudiantes) {
         <span class="gc-panel-count">${carreras.length} ${carreras.length === 1 ? 'carrera' : 'carreras'}</span>
       </div>
 
-      <!-- Botón "Todas" -->
       <button
         class="gc-filter-todas gc-chip-active"
         data-key="${escHtml(key)}"
         data-carrera="todas"
       >
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
-          stroke-linecap="round" stroke-linejoin="round">
+        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+          stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
           <line x1="3" y1="6" x2="21" y2="6"/>
           <line x1="3" y1="12" x2="21" y2="12"/>
           <line x1="3" y1="18" x2="21" y2="18"/>
@@ -601,7 +902,6 @@ function buildCarrerasPanel(key, estudiantes) {
         Todas las carreras
       </button>
 
-      <!-- Grid de tarjetas -->
       <div class="gc-carreras-grid">
         ${cardsHtml}
       </div>
@@ -610,12 +910,15 @@ function buildCarrerasPanel(key, estudiantes) {
 }
 
 /* ══════════════════════════════════════════════════════════════
-   CONTENIDO DEL PANEL EXPANDIBLE (búsqueda + tabla)
+   CONTENIDO DEL PANEL EXPANDIBLE
 ══════════════════════════════════════════════════════════════ */
 
 function buildGrupoBodyContent(key, estudiantes) {
   const entries = Object.entries(estudiantes);
   if (!entries.length) return '<p style="padding:20px;color:#94a3b8;">Sin estudiantes.</p>';
+
+  const total      = entries.length;
+  const asistieron = entries.filter(([, d]) => d.asistencia).length;
 
   const filas = entries.map(([ced, d], i) => `
     <tr>
@@ -625,15 +928,61 @@ function buildGrupoBodyContent(key, estudiantes) {
       <td>${escHtml(d.carrera || '')}</td>
       <td class="badge-telegram">${escHtml(d.telegram || '—')}</td>
       <td>
-        <span class="${d.asistencia ? 'tag-asistencia-ok' : 'tag-asistencia-no'}">
-          ${d.asistencia ? 'Presente' : 'Ausente'}
-        </span>
+        <button
+          class="btn-toggle-asist ${d.asistencia ? 'btn-toggle-asist--presente' : 'btn-toggle-asist--ausente'}"
+          data-grupo-key="${escHtml(key)}"
+          data-cedula="${escHtml(ced)}"
+          title="${d.asistencia ? 'Click para marcar ausente' : 'Click para marcar presente'}"
+        >
+          ${d.asistencia
+            ? `<svg class="asist-icon--present" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M20 6L9 17l-5-5"/></svg>
+               <svg class="asist-icon--remove" viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round" style="display:none">
+                <line x1="18" y1="6" x2="6" y2="18"/><line x1="6" y1="6" x2="18" y2="18"/>
+               </svg>
+               <span class="asist-label">Presente</span>`
+            : `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor"
+                stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+                <line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/>
+               </svg>
+               <span class="asist-label">Ausente</span>`
+          }
+        </button>
       </td>
     </tr>
   `).join('');
 
   return `
     ${buildCarrerasPanel(key, estudiantes)}
+
+    <!-- ── Barra de acciones: info + botón Excel ── -->
+    <div class="grupo-action-bar">
+      <div class="grupo-action-bar__info">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <circle cx="12" cy="12" r="10"/>
+          <line x1="12" y1="8" x2="12" y2="12"/>
+          <line x1="12" y1="16" x2="12.01" y2="16"/>
+        </svg>
+        ${total} estudiantes · ${asistieron} asistieron
+      </div>
+
+      <button
+        class="btn-dl-excel"
+        data-grupo-key="${escHtml(key)}"
+        title="Descargar lista completa como Excel"
+      >
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"
+          stroke-linecap="round" stroke-linejoin="round">
+          <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
+          <polyline points="7 10 12 15 17 10"/>
+          <line x1="12" y1="15" x2="12" y2="3"/>
+        </svg>
+        Descargar Excel
+      </button>
+    </div>
 
     <!-- Barra de búsqueda -->
     <div class="grupo-search-bar">
@@ -686,6 +1035,24 @@ function buildGrupoBodyContent(key, estudiantes) {
 }
 
 /* ══════════════════════════════════════════════════════════════
+   BIND: TOGGLE ASISTENCIA (en un contenedor)
+══════════════════════════════════════════════════════════════ */
+
+function bindToggleAsistenciaEnContenedor(container, key) {
+  container.querySelectorAll(`.btn-toggle-asist[data-grupo-key="${key}"]`).forEach(btn => {
+    /* Evitar doble-bind */
+    if (btn.dataset.boundToggle) return;
+    btn.dataset.boundToggle = 'true';
+
+    btn.addEventListener('click', () => {
+      const cedula   = btn.dataset.cedula;
+      const grupoKey = btn.dataset.grupoKey;
+      toggleAsistenciaEstudiante(grupoKey, cedula, btn);
+    });
+  });
+}
+
+/* ══════════════════════════════════════════════════════════════
    RENDER PRINCIPAL DE GRUPOS
 ══════════════════════════════════════════════════════════════ */
 
@@ -716,8 +1083,8 @@ function renderGrupos(data) {
         hour: '2-digit', minute: '2-digit'
       });
 
-      const col      = colorPct(pct);
-      const carrMap  = calcCarrerasGrupo(estudiantes);
+      const col       = colorPct(pct);
+      const carrMap   = calcCarrerasGrupo(estudiantes);
       const nCarreras = Object.keys(carrMap).length;
 
       const card = document.createElement('div');
@@ -783,9 +1150,7 @@ function renderGrupos(data) {
         <!-- Barra de progreso slim -->
         <div class="grupo-card__progress-row">
           <div class="grupo-card__progress-track">
-            <div class="grupo-card__progress-fill"
-              style="width:${pct}%;background:${col.text};">
-            </div>
+            <div class="grupo-card__progress-fill" style="width:${pct}%;background:${col.text};"></div>
           </div>
         </div>
 
@@ -808,6 +1173,22 @@ function renderGrupos(data) {
       body.style.display = isOpen ? 'none' : 'block';
       btn.setAttribute('aria-expanded', String(!isOpen));
       btn.querySelector('.toggle-chevron').style.transform = isOpen ? '' : 'rotate(180deg)';
+    });
+  });
+
+  /* ── Bind: botones toggle asistencia (render inicial) ── */
+  gruposListContainer.querySelectorAll('.btn-toggle-asist').forEach(btn => {
+    if (btn.dataset.boundToggle) return;
+    btn.dataset.boundToggle = 'true';
+    btn.addEventListener('click', () => {
+      toggleAsistenciaEstudiante(btn.dataset.grupoKey, btn.dataset.cedula, btn);
+    });
+  });
+
+  /* ── Bind: descargar Excel ── */
+  gruposListContainer.querySelectorAll('.btn-dl-excel').forEach(btn => {
+    btn.addEventListener('click', () => {
+      descargarExcelGrupo(btn.dataset.grupoKey);
     });
   });
 
@@ -839,11 +1220,9 @@ function renderGrupos(data) {
       const key = btn.dataset.key;
       gruposCarreraState[key] = 'todas';
 
-      /* Limpiar búsqueda de texto */
       const searchInput = gruposListContainer.querySelector(`.grupo-search-input[data-grupo-key="${key}"]`);
       if (searchInput) { searchInput.value = ''; gruposSearchState[key] = ''; }
 
-      /* Actualizar estilos */
       gruposListContainer.querySelectorAll(`.gc-carrera-card[data-key="${key}"]`)
         .forEach(c => c.classList.remove('gc-chip-active'));
       btn.classList.add('gc-chip-active');
@@ -860,11 +1239,9 @@ function renderGrupos(data) {
 
       gruposCarreraState[key] = carrera;
 
-      /* Limpiar búsqueda de texto */
       const searchInput = gruposListContainer.querySelector(`.grupo-search-input[data-grupo-key="${key}"]`);
       if (searchInput) { searchInput.value = ''; gruposSearchState[key] = ''; }
 
-      /* Actualizar estilos activos */
       gruposListContainer.querySelectorAll(`.gc-carrera-card[data-key="${key}"]`)
         .forEach(c => c.classList.remove('gc-chip-active'));
       gruposListContainer.querySelectorAll(`.gc-filter-todas[data-key="${key}"]`)
@@ -898,7 +1275,9 @@ function bindEventosExcel() {
   if (openExcelModalBtn)  openExcelModalBtn.addEventListener('click', openExcelReview);
   if (closeExcelModalBtn) closeExcelModalBtn.addEventListener('click', closeExcelModal);
   if (cancelExcelBtn)     cancelExcelBtn.addEventListener('click', closeExcelModal);
-  if (excelModalBackdrop) excelModalBackdrop.addEventListener('click', e => { if (e.target === excelModalBackdrop) closeExcelModal(); });
+  if (excelModalBackdrop) excelModalBackdrop.addEventListener('click', e => {
+    if (e.target === excelModalBackdrop) closeExcelModal();
+  });
   if (mapCedulaSelect)    mapCedulaSelect.addEventListener('change',  () => { excelState.mapping.cedula  = mapCedulaSelect.value; });
   if (mapNombresSelect)   mapNombresSelect.addEventListener('change', () => { excelState.mapping.nombres = mapNombresSelect.value; });
   if (mapCarreraSelect)   mapCarreraSelect.addEventListener('change', () => { excelState.mapping.carrera = mapCarreraSelect.value; });
@@ -909,8 +1288,12 @@ function bindEventosGrupos() {
   if (migrarBtn)          migrarBtn.addEventListener('click', openGrupoModal);
   if (cancelarGrupoBtn)   cancelarGrupoBtn.addEventListener('click', closeGrupoModal);
   if (closeGrupoModalBtn) closeGrupoModalBtn.addEventListener('click', closeGrupoModal);
-  if (grupoModalBackdrop) grupoModalBackdrop.addEventListener('click', e => { if (e.target === grupoModalBackdrop) closeGrupoModal(); });
-  if (grupoNombreInput)   grupoNombreInput.addEventListener('keydown', e => { if (e.key === 'Enter') confirmarGrupoBtn?.click(); });
+  if (grupoModalBackdrop) grupoModalBackdrop.addEventListener('click', e => {
+    if (e.target === grupoModalBackdrop) closeGrupoModal();
+  });
+  if (grupoNombreInput)   grupoNombreInput.addEventListener('keydown', e => {
+    if (e.key === 'Enter') confirmarGrupoBtn?.click();
+  });
   if (confirmarGrupoBtn)  confirmarGrupoBtn.addEventListener('click', confirmarMigracionGrupo);
 }
 
