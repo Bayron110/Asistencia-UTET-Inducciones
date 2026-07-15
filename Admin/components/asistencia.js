@@ -171,6 +171,7 @@ function recomputeRegistros() {
       cedula,
       nombre:        adminData.nombres      || adminData.nombre  || '',
       carrera:       adminData.carrera      || '',
+      sede:          adminData.sede         || '',   // ← AGREGAR ESTA LÍNEA
       telegram:      adminData.telegram     || '',
       asistencia:    adminData.asistencia   === true,
       retirado:      adminData.retirado     === true,

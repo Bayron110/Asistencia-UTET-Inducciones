@@ -39,6 +39,7 @@ const excelHeadersList      = $('excelHeadersList');
 const mapCedulaSelect       = $('mapCedulaSelect');
 const mapNombresSelect      = $('mapNombresSelect');
 const mapCarreraSelect      = $('mapCarreraSelect');
+const mapSedeSelect         = $('mapSedeSelect');
 const excelPreviewHead      = $('excelPreviewHead');
 const excelPreviewBody      = $('excelPreviewBody');
 const migrarBtn             = $('migrarBtn');
@@ -60,7 +61,7 @@ const gruposCarreraState = {};
 let excelState = {
   file: null, fileName: '', sheetName: '',
   headers: [], rows: [], rowsFormatted: [],
-  mapping: { cedula: '', nombres: '', carrera: '' }
+  mapping: { cedula: '', nombres: '', carrera: '', sede: '' }
 };
 
 
@@ -404,6 +405,7 @@ function descargarExcelGrupo(grupoKey) {
     'Cédula':     cedula,
     'Nombres':    d.nombres || '',
     'Carrera':    d.carrera  || '',
+    'Sede':       d.sede || d.Sede || d.sede_nombre || '',
     'Telegram':   d.telegram || '',
     'Asistencia': d.asistencia ? 'Presente' : 'Ausente'
   }));
@@ -433,6 +435,7 @@ function descargarExcelGrupo(grupoKey) {
     { wch: 14 }, /* Cédula */
     { wch: 34 }, /* Nombres */
     { wch: 30 }, /* Carrera */
+    { wch: 20 }, /* Sede */
     { wch: 20 }, /* Telegram */
     { wch: 12 }  /* Asistencia */
   ];
@@ -552,7 +555,8 @@ function openExcelReview() {
         mapping: {
           cedula:  suggestHeader(headers, ['cedula','cédula','dni','identificacion','identificación']),
           nombres: suggestHeader(headers, ['nombres','nombre','apellidos','estudiante','alumno']),
-          carrera: suggestHeader(headers, ['carrera','programa','especialidad','curso'])
+          carrera: suggestHeader(headers, ['carrera','programa','especialidad','curso']),
+          sede:    suggestHeader(headers, ['sede','campus','extension','extensión'])
         }
       };
       fillExcelModal();
@@ -587,12 +591,12 @@ function renderHeaders() {
 }
 
 function renderMappingSelects() {
-  if (!mapCedulaSelect || !mapNombresSelect || !mapCarreraSelect) return;
-  [mapCedulaSelect, mapNombresSelect, mapCarreraSelect].forEach(sel => {
+  if (!mapCedulaSelect || !mapNombresSelect || !mapCarreraSelect || !mapSedeSelect) return;
+  [mapCedulaSelect, mapNombresSelect, mapCarreraSelect, mapSedeSelect].forEach(sel => {
     sel.innerHTML = '<option value="">-- Seleccionar columna --</option>';
   });
   excelState.headers.forEach(header => {
-    [mapCedulaSelect, mapNombresSelect, mapCarreraSelect].forEach(sel => {
+    [mapCedulaSelect, mapNombresSelect, mapCarreraSelect, mapSedeSelect].forEach(sel => {
       const opt = document.createElement('option');
       opt.value = opt.textContent = header;
       sel.appendChild(opt);
@@ -601,6 +605,7 @@ function renderMappingSelects() {
   if (excelState.mapping.cedula)  mapCedulaSelect.value  = excelState.mapping.cedula;
   if (excelState.mapping.nombres) mapNombresSelect.value = excelState.mapping.nombres;
   if (excelState.mapping.carrera) mapCarreraSelect.value = excelState.mapping.carrera;
+  if (excelState.mapping.sede)    mapSedeSelect.value    = excelState.mapping.sede;
 }
 
 function renderPreviewTable() {
@@ -634,6 +639,7 @@ async function prepararCargaExcel() {
   const cedulaCol  = mapCedulaSelect?.value  || '';
   const nombresCol = mapNombresSelect?.value || '';
   const carreraCol = mapCarreraSelect?.value || '';
+  const sedeCol    = mapSedeSelect?.value    || '';
   if (!cedulaCol) { toast('Debes seleccionar al menos la columna de cédula.', 'warn'); return; }
 
   const registrosLimpios = {};
@@ -643,6 +649,7 @@ async function prepararCargaExcel() {
     const registro = { cedula, telegram: '', asistencia: false };
     if (nombresCol) { const n = rawToTexto(row[nombresCol]); if (n) registro.nombres = n; }
     if (carreraCol) { const c = rawToTexto(row[carreraCol]); if (c) registro.carrera = c; }
+    if (sedeCol)    { const s = rawToTexto(row[sedeCol]);    if (s) registro.sede    = s; }
     registrosLimpios[cedula] = registro;
   }
   const totalValidos = Object.keys(registrosLimpios).length;
@@ -695,6 +702,7 @@ async function confirmarMigracionGrupo() {
         cedula,
         nombres:    d.nombre || d.nombres || '',
         carrera:    d.carrera  || '',
+        sede:       d.sede || d.Sede || d.sede_nombre || '',
         telegram:   d.telegram || '',
         asistencia: d.asistencia === true
       };
@@ -1281,6 +1289,7 @@ function bindEventosExcel() {
   if (mapCedulaSelect)    mapCedulaSelect.addEventListener('change',  () => { excelState.mapping.cedula  = mapCedulaSelect.value; });
   if (mapNombresSelect)   mapNombresSelect.addEventListener('change', () => { excelState.mapping.nombres = mapNombresSelect.value; });
   if (mapCarreraSelect)   mapCarreraSelect.addEventListener('change', () => { excelState.mapping.carrera = mapCarreraSelect.value; });
+  if (mapSedeSelect)      mapSedeSelect.addEventListener('change',    () => { excelState.mapping.sede    = mapSedeSelect.value; });
   if (prepareExcelBtn)    prepareExcelBtn.addEventListener('click', prepararCargaExcel);
 }
 
