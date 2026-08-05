@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-app.js';
-import { getDatabase, ref, get, onValue } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
+import { getDatabase, ref, get, onValue, update } from 'https://www.gstatic.com/firebasejs/10.12.0/firebase-database.js';
 
 const firebaseConfig = {
     apiKey: "AIzaSyAl394v1xuNXxqkT6lEsiPQf74mFSIW6bw",
@@ -58,4 +58,28 @@ export async function obtenerDocentePorCedula(cedula) {
     const db = getDatabase(getApp('cronogramas'));
     const snap = await get(ref(db, `docentes/${cedula}`));
     return snap.exists() ? snap.val() : null;
+}
+
+/**
+ * Actualiza hora de inicio y/o link de clase de una actividad puntual
+ * dentro de cronogramas/{cronogramaId}/actividades/{index}.
+ * Si un valor viene vacío, se guarda como null (lo borra en Firebase).
+ */
+export async function actualizarActividad(cronogramaId, index, datos) {
+    const payload = {};
+    if (datos.horaInicio !== undefined) payload.horaInicio = datos.horaInicio || null;
+    if (datos.linkClase  !== undefined) payload.linkClase  = datos.linkClase  || null;
+
+    await update(ref(db, `cronogramas/${cronogramaId}/actividades/${index}`), payload);
+}
+
+/**
+ * Guarda/actualiza el link del grupo de Telegram de una carrera
+ * DENTRO de un cronograma específico (cada cohorte tiene sus propios links)
+ */
+export async function guardarGrupoCarrera(cronogramaId, carreraKey, nombreCarrera, link) {
+    await update(ref(db, `cronogramas/${cronogramaId}/gruposCarrera/${carreraKey}`), {
+        nombre: nombreCarrera,
+        link: link || null
+    });
 }

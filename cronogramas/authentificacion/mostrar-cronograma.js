@@ -3,16 +3,17 @@
 // Sin parámetros → redirige a cedula-solicitud.html
 // ─────────────────────────────────────────────────────────────
 
-import { escucharCronogramas, calcularEstado, obtenerCronogramas, obtenerDocentePorCedula } from '../../Firebase/cronograma.js';
+import { escucharCronogramas, calcularEstado, obtenerCronogramas, obtenerDocentePorCedula, actualizarActividad, guardarGrupoCarrera } from '../../Firebase/cronograma.js';
 import { generarLinkActivacion, procesarRegistros, revisarYNotificar } from '../notificaciones/notificacon-web.js';
+import { irAAreaDocente, obtenerLinkPorDepartamento } from '../Ruta/Acceso.js';
 
 const BOT_USERNAME = 'itsometcronogramas_bot';
-const BACKEND_URL  = 'https://itsqmet-bot-backend.onrender.com';
+const BACKEND_URL = 'https://itsqmet-bot-backend.onrender.com';
 
-const urlParams    = new URLSearchParams(window.location.search);
-const PARAM_CEDULA   = urlParams.get('cedula');
+const urlParams = new URLSearchParams(window.location.search);
+const PARAM_CEDULA = urlParams.get('cedula');
 const PARAM_CRONO_ID = urlParams.get('cronogramaId');
-const PARAM_TIPO     = urlParams.get('tipo') ?? 'estudiante';
+const PARAM_TIPO = urlParams.get('tipo') ?? 'estudiante';
 
 if (!PARAM_CEDULA || !PARAM_CRONO_ID) {
     window.location.replace('cedula-solicitud.html');
@@ -26,6 +27,7 @@ document.getElementById("videoIzq").src = videoAleatorio;
 document.getElementById("videoDer").src = videoAleatorio;
 
 let todosLosCronogramas = [];
+let docenteEsUnidadTitulacion = false;
 let filtroActual = 'TODOS';
 
 // ── Reloj ─────────────────────────────────────────────────────
@@ -51,12 +53,33 @@ function formatearFecha(fecha) {
 
 function badgeEstado(estado) {
     const cfg = {
-        VIGENTE:    { label: 'Vigente',    clase: 'vigente' },
+        VIGENTE: { label: 'Vigente', clase: 'vigente' },
         PROGRAMADO: { label: 'Programado', clase: 'programado' },
         FINALIZADO: { label: 'Finalizado', clase: 'finalizado' },
     };
     const { label, clase } = cfg[estado] ?? { label: estado, clase: '' };
     return `<span class="badge ${clase}">${label}</span>`;
+}
+
+// ── Normaliza el nombre de carrera a una clave válida para Firebase ──
+function slugCarrera(carrera) {
+    return (carrera || '')
+        .toString()
+        .trim()
+        .toUpperCase()
+        .normalize('NFD').replace(/[\u0300-\u036f]/g, '') // quita tildes
+        .replace(/[^A-Z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '');
+}
+
+function esURLValida(str) {
+    if (!str) return true; // vacío está permitido, el link es opcional
+    try {
+        const u = new URL(str);
+        return u.protocol === 'http:' || u.protocol === 'https:';
+    } catch {
+        return false;
+    }
 }
 
 function actividadFinalizada(fechaFin) {
@@ -67,6 +90,90 @@ function actividadFinalizada(fechaFin) {
 
 function obtenerCronogramasDelDocente(lista, cedula) {
     return lista.filter(c => c.docentesVinculados?.[cedula]);
+}
+
+// ── Abrevia los nombres de meses dentro de un periodo ──────────
+const MESES_ABREV = {
+    enero: 'Ene', febrero: 'Feb', marzo: 'Mar', abril: 'Abr',
+    mayo: 'May', junio: 'Jun', julio: 'Jul', agosto: 'Ago',
+    septiembre: 'Sep', setiembre: 'Sep', octubre: 'Oct',
+    noviembre: 'Nov', diciembre: 'Dic'
+};
+
+function abreviarPeriodo(periodo) {
+    if (!periodo) return '';
+    let resultado = periodo;
+    Object.entries(MESES_ABREV).forEach(([completo, abrev]) => {
+        resultado = resultado.replace(new RegExp(completo, 'gi'), abrev);
+    });
+    return resultado;
+}
+
+// ── Mapa manual de abreviaciones por carrera (editable) ─────────
+// Clave = slugCarrera(nombreCarrera), Valor = abreviación corta
+// Agrega aquí nuevas carreras con el mismo patrón cuando haga falta.
+const MAPA_ABREVIATURAS = {
+    'DISENO_MULTIMEDIA_ONLINE': 'Multimedia',
+    'MECANICA_AUTOMOTRIZ': 'Mecanica',
+    'MECANICA_DE_MOTOS': 'Motos',
+    'PROCESAMIENTO_EN_ALIMENTOS': 'Alimentos',
+    'SEGURIDAD_CIUDADANA_Y_ORDEN_PUBLICO_ONLINE': 'Seguridad',
+    'SEGURIDAD_Y_PREVENCION_DE_RIESGOS_LABORALES': 'Riesgos',
+    'UNIVERSITARIA_EN_ADMINISTRACION_DE_EMPRESAS': 'Administración',
+    'UNIVERSITARIA_EN_ADMINISTRACION_DE_TALENTO_HUMANO': 'Talento',
+    'UNIVERSITARIA_EN_CONTABILIDAD_Y_TRIBUTARIA': 'Contabilidad',
+    'UNIVERSITARIA_EN_EDUCACION_INICIAL_ONLINE': 'Inicial',
+    'UNIVERSITARIA_EN_MARKETING_DIGITAL_ONLINE': 'MKT',
+    'UNIVERSITARIA_EN_PEDAGOGIA': 'Pedagogia',
+    'UNIVERSITARIA_EN_REDES_Y_TELECOMUNICACIONES_ONLINE': 'Redes',
+    'UNIVERSITARIA_EN_SOFTWARE_Y_CIBERSEGURIDAD': 'Software',
+    'VENTAS_ONLINE': 'Ventas',
+    'ESTETICA_INTEGRAL': 'Estetica',
+    'GASTRONOMIA': 'Gastronomia',
+};
+
+// ── Fallback: si la carrera no está en el mapa, deriva algo razonable ──
+const PALABRAS_FILTRO = new Set([
+    'UNIVERSITARIA', 'EN', 'DE', 'DEL', 'LA', 'EL', 'Y', 'ONLINE'
+]);
+
+function abreviarNombreCarrera(carrera) {
+    const key = slugCarrera(carrera);
+    if (MAPA_ABREVIATURAS[key]) return MAPA_ABREVIATURAS[key];
+
+    // Fallback automático: primera palabra significativa
+    const palabras = (carrera || '').trim().split(/\s+/);
+    const significativa = palabras.find(p => !PALABRAS_FILTRO.has(p.toUpperCase())) ?? palabras[0] ?? '';
+    return significativa.charAt(0).toUpperCase() + significativa.slice(1).toLowerCase();
+}
+
+// ── Descargar Excel: Nombre de Carrera | Abreviación ─────────────
+async function descargarExcelCarreras(c, carreras) {
+    if (!carreras || carreras.length === 0) {
+        mostrarToast('⚠️ No hay carreras para exportar');
+        return;
+    }
+    try {
+        const XLSX = await import('https://cdn.jsdelivr.net/npm/xlsx@0.18.5/+esm');
+        const periodoAbrev = abreviarPeriodo(c.periodo);
+
+        const filas = carreras.map(carrera => ({
+            'Nombre de la Carrera': carrera,
+            'Abreviación': `${abreviarNombreCarrera(carrera)}-${periodoAbrev}`
+        }));
+
+        const ws = XLSX.utils.json_to_sheet(filas);
+        ws['!cols'] = [{ wch: 48 }, { wch: 30 }];
+
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, 'Carreras');
+
+        const nombreArchivo = `Carreras_${(c.nombre ?? 'Cronograma').replace(/[^a-zA-Z0-9]+/g, '_')}.xlsx`;
+        XLSX.writeFile(wb, nombreArchivo);
+    } catch (err) {
+        console.error('Error generando Excel:', err);
+        mostrarToast('❌ No se pudo generar el Excel');
+    }
 }
 
 // ── Despertar backend con overlay bloqueante ──────────────────
@@ -113,7 +220,7 @@ async function despertarBackend(accionAlDesperar) {
     document.body.appendChild(overlay);
 
     const MAX_INTENTOS = 5;
-    const TIMEOUT_MS   = 8000;
+    const TIMEOUT_MS = 8000;
 
     for (let i = 1; i <= MAX_INTENTOS; i++) {
         mostrarEspera(i === 1 ? 'Esto puede tomar unos segundos...' : `Reintentando... (${i}/${MAX_INTENTOS})`);
@@ -205,10 +312,10 @@ async function despertarBackend(accionAlDesperar) {
 // ── Card ──────────────────────────────────────────────────────
 function crearCard(c) {
     const estado = calcularEstado(c.fechaInicio, c.fechaFin);
-    const total  = c.actividades ? c.actividades.length : 0;
+    const total = c.actividades ? c.actividades.length : 0;
 
     const card = document.createElement('div');
-    card.className  = 'crono-card';
+    card.className = 'crono-card';
     card.dataset.id = c.id;
 
     card.innerHTML = `
@@ -279,10 +386,10 @@ function siguienteActividad(actividades) {
 function calcularPorcentaje(fechaInicio, fechaFin) {
     if (!fechaInicio || !fechaFin) return 0;
     const inicio = new Date(fechaInicio + 'T00:00:00').getTime();
-    const fin    = new Date(fechaFin    + 'T23:59:59').getTime();
-    const hoy    = Date.now();
+    const fin = new Date(fechaFin + 'T23:59:59').getTime();
+    const hoy = Date.now();
     if (hoy <= inicio) return 0;
-    if (hoy >= fin)    return 100;
+    if (hoy >= fin) return 100;
     return Math.round(((hoy - inicio) / (fin - inicio)) * 100);
 }
 
@@ -296,13 +403,14 @@ async function renderPanelEstudiante(cronogramaId) {
     if (!crono) return;
 
     const estudiante = crono.estudiantesVinculados?.[PARAM_CEDULA];
-    const nombre  = estudiante?.nombres ?? estudiante?.nombre ?? 'Estudiante';
+    const nombre = estudiante?.nombres ?? estudiante?.nombre ?? 'Estudiante';
     const carrera = estudiante?.carrera ?? '';
+const linkGrupoCarrera = carrera ? (crono.gruposCarrera?.[slugCarrera(carrera)]?.link || null) : null;
 
-    const pct      = calcularPorcentaje(crono.fechaInicio, crono.fechaFin);
-    const proxAct  = siguienteActividad(crono.actividades ?? []);
+    const pct = calcularPorcentaje(crono.fechaInicio, crono.fechaFin);
+    const proxAct = siguienteActividad(crono.actividades ?? []);
     const totalAct = crono.actividades?.length ?? 0;
-    const hechas   = (crono.actividades ?? []).filter(a => {
+    const hechas = (crono.actividades ?? []).filter(a => {
         if (!a.fechaFin) return false;
         return new Date(a.fechaFin + 'T23:59:59') < new Date();
     }).length;
@@ -338,6 +446,14 @@ async function renderPanelEstudiante(cronogramaId) {
                 <span>Activar notificaciones</span>
             </button>
         </div>
+        ${linkGrupoCarrera ? `
+<div class="ep-notif-bloque">
+    <a href="${linkGrupoCarrera}" target="_blank" rel="noopener noreferrer"
+        class="ep-btn-notif" style="text-decoration:none;">
+        <i class="ti ti-brand-telegram"></i>
+        <span>Grupo de Telegram de mi carrera</span>
+    </a>
+</div>` : ''}
 
         ${proxAct ? `
         <div class="ep-proxima">
@@ -360,8 +476,8 @@ async function renderPanelEstudiante(cronogramaId) {
 
     panel.classList.remove('oculto');
 
-    const btnNotif  = document.getElementById('btnNotificaciones');
-    const yaActivo  = estudiante?.notificacionesActivas && estudiante?.telegramChatId;
+    const btnNotif = document.getElementById('btnNotificaciones');
+    const yaActivo = estudiante?.notificacionesActivas && estudiante?.telegramChatId;
 
     if (btnNotif) {
         if (yaActivo) {
@@ -400,12 +516,14 @@ async function renderPanelDocente(cronogramaId) {
     if (!crono) return;
 
     const docenteVinculado = crono.docentesVinculados?.[PARAM_CEDULA];
-    const nombre      = docenteVinculado?.nombres ?? docenteVinculado?.nombre ?? 'Docente';
+    const nombre = docenteVinculado?.nombres ?? docenteVinculado?.nombre ?? 'Docente';
     const especialidad = docenteVinculado?.especialidad ?? docenteVinculado?.carrera ?? '';
 
-    const docenteGlobal  = await obtenerDocentePorCedula(PARAM_CEDULA);
-    const cronosDocente  = obtenerCronogramasDelDocente(lista, PARAM_CEDULA);
-    const totalCronos    = cronosDocente.length;
+    const docenteGlobal = await obtenerDocentePorCedula(PARAM_CEDULA);
+    const esUnidadTitulacion = (docenteGlobal?.departamento ?? '').trim() === 'Unidad de Titulación';
+    docenteEsUnidadTitulacion = esUnidadTitulacion;
+    const cronosDocente = obtenerCronogramasDelDocente(lista, PARAM_CEDULA);
+    const totalCronos = cronosDocente.length;
 
     const todasActividades = cronosDocente.flatMap(c =>
         (c.actividades ?? []).map(a => ({ ...a, cronogramaNombre: c.nombre ?? '' }))
@@ -415,8 +533,8 @@ async function renderPanelDocente(cronogramaId) {
     const proximasPorCronograma = cronosDocente
         .map(c => ({
             cronogramaNombre: c.nombre ?? 'Sin nombre',
-            periodo:          c.periodo ?? '',
-            actividad:        siguienteActividad(c.actividades ?? [])
+            periodo: c.periodo ?? '',
+            actividad: siguienteActividad(c.actividades ?? [])
         }))
         .filter(p => p.actividad !== null);
 
@@ -491,6 +609,13 @@ async function renderPanelDocente(cronogramaId) {
         </button>
     </div>
 
+    <div class="ep-notif-bloque">
+        <button class="ep-btn-notif" id="btnIrAreaDocente">
+            <i class="ti ti-external-link"></i>
+            <span>Ir a mi área${docenteGlobal?.departamento ? ` — ${docenteGlobal.departamento}` : ''}</span>
+        </button>
+    </div>
+
     <div class="ep-proximas-lista">
         ${htmlProximas}
     </div>
@@ -533,6 +658,16 @@ async function renderPanelDocente(cronogramaId) {
             await despertarBackend(accion);
         });
     }
+
+    const btnArea = document.getElementById('btnIrAreaDocente');
+    if (btnArea) {
+        const tieneLink = obtenerLinkPorDepartamento(docenteGlobal?.departamento);
+        if (!tieneLink) btnArea.classList.add('notif-activa');
+
+        btnArea.addEventListener('click', () => {
+            irAAreaDocente(docenteGlobal?.departamento);
+        });
+    }
 }
 
 // ── Toast ─────────────────────────────────────────────────────
@@ -558,7 +693,7 @@ function mostrarModalInstruccion(cedula, cronogramaId) {
     const existing = document.getElementById('modalInstruccion');
     if (existing) existing.remove();
 
-    const payload    = `${cedula}-${cronogramaId}`;
+    const payload = `${cedula}-${cronogramaId}`;
     const linkNativo = `https://t.me/${BOT_USERNAME}?start=${payload}`;
 
     const modal = document.createElement('div');
@@ -622,7 +757,7 @@ function mostrarModalInstruccionDocente(cedula, cronogramaId) {
     const existing = document.getElementById('modalInstruccion');
     if (existing) existing.remove();
 
-    const payload    = `DOC-${cedula}-${cronogramaId}`;
+    const payload = `DOC-${cedula}-${cronogramaId}`;
     const linkNativo = `https://t.me/${BOT_USERNAME}?start=${payload}`;
 
     const modal = document.createElement('div');
@@ -681,6 +816,140 @@ function mostrarModalInstruccionDocente(cedula, cronogramaId) {
     modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
 }
 
+// ── Modal: Grupos de Telegram por carrera (de esta cohorte) ────
+function abrirModalGruposCarrera(c) {
+    const existing = document.getElementById('modalGruposCarrera');
+    if (existing) existing.remove();
+
+    const estudiantes = c.estudiantesVinculados ?? {};
+    const carrerasSet = new Set();
+    Object.values(estudiantes).forEach(est => {
+        const carrera = (est.carrera ?? '').trim();
+        if (carrera) carrerasSet.add(carrera);
+    });
+    const carreras = Array.from(carrerasSet).sort((a, b) => a.localeCompare(b, 'es'));
+
+    const modal = document.createElement('div');
+    modal.id = 'modalGruposCarrera';
+    modal.style.cssText = `
+        position:fixed;inset:0;background:rgba(3,14,40,0.70);
+        display:flex;align-items:center;justify-content:center;
+        z-index:9999;padding:16px;backdrop-filter:blur(4px);
+    `;
+
+    const filas = carreras.length === 0
+        ? `<p style="color:#64748b;font-size:13px;text-align:center;padding:20px 0;">
+               No hay estudiantes vinculados con carrera registrada en este cronograma.
+           </p>`
+        : carreras.map(carrera => {
+            const key = slugCarrera(carrera);
+            const linkGuardado = c.gruposCarrera?.[key]?.link ?? '';
+            return `
+                <div class="fila-carrera" data-key="${key}"
+                    data-carrera="${carrera.replace(/"/g, '&quot;')}"
+                    style="display:flex;flex-direction:column;gap:6px;padding:10px 0;border-bottom:1px solid #eef3f9;">
+                    <span style="font-size:12.5px;font-weight:700;color:#0a3d7c;">
+                        <i class="ti ti-school"></i> ${carrera}
+                    </span>
+                    <div style="display:flex;gap:8px;align-items:center;">
+                        <input type="url" class="input-link-carrera" placeholder="https://t.me/..."
+                            value="${linkGuardado}"
+                            style="flex:1;padding:8px 10px;border-radius:8px;border:1.5px solid #dde7f2;
+                                   font-size:12.5px;font-family:'DM Sans',sans-serif;color:#0a3d7c;">
+                        <button class="btn-guardar-carrera"
+                            style="flex-shrink:0;padding:8px 11px;border-radius:8px;border:none;
+                                   background:#0a3d7c;color:#fff;cursor:pointer;">
+                            <i class="ti ti-device-floppy"></i>
+                        </button>
+                        <span class="estado-guardado" style="font-size:11px;color:#22c55e;opacity:0;transition:opacity 0.3s;">
+                            <i class="ti ti-check"></i>
+                        </span>
+                    </div>
+                </div>
+            `;
+        }).join('');
+
+    modal.innerHTML = `
+        <div style="
+            background:#fff;border:1px solid #b0cef0;
+            border-radius:16px;padding:28px 26px;max-width:460px;width:100%;
+            max-height:85vh;overflow-y:auto;
+            font-family:'DM Sans',sans-serif;
+            box-shadow:0 20px 60px rgba(0,0,0,0.40);
+        ">
+            <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+                <span style="font-size:1.6rem;">🎓</span>
+                <h3 style="color:#0a3d7c;font-size:17px;font-weight:700;margin:0;">
+                    Grupos de Telegram por carrera
+                </h3>
+            </div>
+            <p style="color:#94a8c2;font-size:12px;margin-bottom:16px;">
+                ${c.nombre ?? 'Sin nombre'}${c.periodo ? ' · ' + c.periodo : ''}
+            </p>
+            <button id="btnDescargarExcelCarreras" style="
+                width:100%;margin-bottom:16px;padding:10px;
+                border-radius:8px;border:1.5px solid rgba(34,197,94,0.35);
+                background:rgba(34,197,94,0.10);color:#16a34a;
+                font-weight:600;font-size:13px;cursor:pointer;
+                display:flex;align-items:center;justify-content:center;gap:8px;
+                font-family:'DM Sans',sans-serif;
+            ">
+                <i class="ti ti-file-spreadsheet"></i>
+                Descargar Excel
+            </button>
+            <div id="listaCarrerasGrupos">${filas}</div>
+            <button id="btnCerrarGruposCarrera" style="
+                margin-top:12px;width:100%;padding:11px;background:transparent;
+                color:#64748b;border:1.5px solid #dde7f2;
+                border-radius:8px;cursor:pointer;font-size:13px;
+                font-family:'DM Sans',sans-serif;
+            ">Cerrar</button>
+        </div>
+    `;
+
+    document.body.appendChild(modal);
+
+    const btnExcel = document.getElementById('btnDescargarExcelCarreras');
+    if (btnExcel) {
+        btnExcel.addEventListener('click', () => descargarExcelCarreras(c, carreras));
+    }
+
+    modal.querySelectorAll('.fila-carrera').forEach(fila => {
+        const key           = fila.dataset.key;
+        const carreraNombre = fila.dataset.carrera;
+        const input         = fila.querySelector('.input-link-carrera');
+        const btnGuardar    = fila.querySelector('.btn-guardar-carrera');
+        const estadoOk      = fila.querySelector('.estado-guardado');
+
+        btnGuardar.addEventListener('click', async () => {
+            const link = input.value.trim();
+            if (link && !esURLValida(link)) {
+                mostrarToast('⚠️ El link no es una URL válida (debe empezar con http:// o https://)');
+                input.focus();
+                return;
+            }
+            btnGuardar.disabled = true;
+            try {
+                await guardarGrupoCarrera(c.id, key, carreraNombre, link);
+                c.gruposCarrera = c.gruposCarrera ?? {};
+                c.gruposCarrera[key] = { nombre: carreraNombre, link: link || null };
+
+                estadoOk.style.opacity = '1';
+                setTimeout(() => { estadoOk.style.opacity = '0'; }, 1800);
+                mostrarToast(`✅ Link guardado para ${carreraNombre}`);
+            } catch (err) {
+                console.error('Error guardando grupo de carrera:', err);
+                mostrarToast('❌ No se pudo guardar el link. Intenta nuevamente.');
+            } finally {
+                btnGuardar.disabled = false;
+            }
+        });
+    });
+
+    document.getElementById('btnCerrarGruposCarrera').addEventListener('click', () => modal.remove());
+    modal.addEventListener('click', e => { if (e.target === modal) modal.remove(); });
+}
+
 // ── Polling docente ───────────────────────────────────────────
 async function iniciarPollingDocente(cronogramaId) {
     if (pollingInterval) return;
@@ -723,7 +992,7 @@ function iniciarPolling(cronogramaId) {
 
         const lista = await obtenerCronogramas();
         const crono = lista.find(c => c.id === cronogramaId);
-        const est   = crono?.estudiantesVinculados?.[PARAM_CEDULA];
+        const est = crono?.estudiantesVinculados?.[PARAM_CEDULA];
 
         if (est?.telegramChatId) {
             clearInterval(pollingInterval);
@@ -746,8 +1015,8 @@ function iniciarPolling(cronogramaId) {
 
 // ── Grid ──────────────────────────────────────────────────────
 function renderGrid(lista) {
-    const grid     = document.getElementById('gridCronogramas');
-    const vacia    = document.getElementById('vistaVacia');
+    const grid = document.getElementById('gridCronogramas');
+    const vacia = document.getElementById('vistaVacia');
     const filtrados = filtrarLista(lista);
 
     grid.innerHTML = '';
@@ -770,20 +1039,40 @@ function actualizarContador(n, filtro) {
     el.textContent = `${n} ${label}${n !== 1 ? 's' : ''} encontrado${n !== 1 ? 's' : ''}`;
 }
 
+// ── Muestra/oculta el botón de grupos por carrera dentro del modal ──
+function actualizarBotonGruposCarrera(c) {
+    const existente = document.getElementById('btnGruposCarreraModal');
+    if (existente) existente.remove();
+
+    if (MODO_ESTUDIANTE || !docenteEsUnidadTitulacion) return;
+
+    const contenedor = document.querySelector('.modal-actividades');
+    if (!contenedor) return;
+
+    const btn = document.createElement('button');
+    btn.id = 'btnGruposCarreraModal';
+    btn.className = 'btn-ver-detalle';
+    btn.style.cssText = 'margin-bottom:18px;';
+    btn.innerHTML = `<i class="ti ti-brand-telegram"></i> Grupos de Telegram por carrera`;
+    btn.addEventListener('click', () => abrirModalGruposCarrera(c));
+
+    contenedor.insertBefore(btn, contenedor.firstChild);
+}
+
 // ── Modal detalle cronograma ──────────────────────────────────
 function abrirModal(c) {
     const estado = calcularEstado(c.fechaInicio, c.fechaFin);
 
-    document.getElementById('modalHeader').style.background  = c.colorFondo ?? '#1565c0';
-    document.getElementById('modalHeader').style.color       = c.colorTexto ?? '#ffffff';
+    document.getElementById('modalHeader').style.background = c.colorFondo ?? '#1565c0';
+    document.getElementById('modalHeader').style.color = c.colorTexto ?? '#ffffff';
     document.getElementById('modalHeader').style.borderColor = c.colorBorde ?? '#0d47a1';
-    document.getElementById('modalHeader').style.fontFamily  = c.fuente ?? 'DM Sans, sans-serif';
+    document.getElementById('modalHeader').style.fontFamily = c.fuente ?? 'DM Sans, sans-serif';
 
-    document.getElementById('modalBadge').innerHTML          = badgeEstado(estado);
-    document.getElementById('modalNombre').textContent       = c.nombre ?? '—';
-    document.getElementById('modalPeriodo').textContent      = c.periodo ?? '—';
-    document.getElementById('modalFechaInicio').textContent  = formatearFecha(c.fechaInicio);
-    document.getElementById('modalFechaFin').textContent     = formatearFecha(c.fechaFin);
+    document.getElementById('modalBadge').innerHTML = badgeEstado(estado);
+    document.getElementById('modalNombre').textContent = c.nombre ?? '—';
+    document.getElementById('modalPeriodo').textContent = c.periodo ?? '—';
+    document.getElementById('modalFechaInicio').textContent = formatearFecha(c.fechaInicio);
+    document.getElementById('modalFechaFin').textContent = formatearFecha(c.fechaFin);
     document.getElementById('modalFechaPublicacion').textContent = formatearFecha(c.fechaPublicacion);
 
     const actividades = c.actividades ?? [];
@@ -795,26 +1084,131 @@ function abrirModal(c) {
         tabla.innerHTML = `
             <table class="modal-table">
                 <thead>
-                    <tr><th>#</th><th>Actividad</th><th>Inicio</th><th>Fin</th></tr>
+                    <tr>
+                        <th>#</th>
+                        <th>Actividad</th>
+                        <th>Inicio</th>
+                        <th>Fin</th>
+                        <th>Hora</th>
+                        <th>Clase</th>
+                        ${MODO_ESTUDIANTE ? '' : '<th></th>'}
+                    </tr>
                 </thead>
                 <tbody>
-                    ${actividades.map((a, i) => `
-                        <tr class="${actividadFinalizada(a.fechaFin) ? 'actividad-finalizada' : ''}">
-                            <td class="td-num">
-                                ${actividadFinalizada(a.fechaFin)
-                                    ? '<i class="ti ti-check"></i>'
-                                    : i + 1}
-                            </td>
-                            <td>${a.actividad}</td>
-                            <td class="td-fecha">${formatearFecha(a.fechaInicio)}</td>
-                            <td class="td-fecha">${formatearFecha(a.fechaFin)}</td>
-                        </tr>
-                    `).join('')}
+                    ${actividades.map((a, i) => filaActividad(a, i)).join('')}
                 </tbody>
             </table>
         `;
+
+        if (!MODO_ESTUDIANTE) {
+            tabla.querySelectorAll('.btn-editar-act').forEach(btn => {
+                btn.addEventListener('click', () => alternarEdicionActividad(btn.dataset.idx));
+            });
+            tabla.querySelectorAll('.btn-cancelar-act').forEach(btn => {
+                btn.addEventListener('click', () => alternarEdicionActividad(btn.dataset.idx, true));
+            });
+            tabla.querySelectorAll('.btn-guardar-act').forEach(btn => {
+                btn.addEventListener('click', () => guardarActividad(c, Number(btn.dataset.idx)));
+            });
+        }
     }
 
+    // ── Fila de actividad (con hora + link de clase) ───────────────
+    function filaActividad(a, i) {
+        const finalizada = actividadFinalizada(a.fechaFin);
+        return `
+        <tr class="${finalizada ? 'actividad-finalizada' : ''}">
+            <td class="td-num">
+                ${finalizada ? '<i class="ti ti-check"></i>' : i + 1}
+            </td>
+            <td>${a.actividad}</td>
+            <td class="td-fecha">${formatearFecha(a.fechaInicio)}</td>
+            <td class="td-fecha">${formatearFecha(a.fechaFin)}</td>
+            <td class="td-hora">
+                <span class="act-view act-view-hora" data-idx="${i}">${a.horaInicio ?? '—'}</span>
+                <input type="time" class="act-edit act-edit-hora oculto" data-idx="${i}"
+                    value="${a.horaInicio ?? ''}" data-original="${a.horaInicio ?? ''}">
+            </td>
+            <td class="td-link">
+                <span class="act-view act-view-link" data-idx="${i}">
+                    ${a.linkClase
+                ? `<a href="${a.linkClase}" target="_blank" rel="noopener noreferrer" class="link-clase"><i class="ti ti-video"></i> Unirse</a>`
+                : '—'}
+                </span>
+                <input type="url" class="act-edit act-edit-link oculto" data-idx="${i}"
+                    placeholder="https://meet.google.com/..." value="${a.linkClase ?? ''}" data-original="${a.linkClase ?? ''}">
+            </td>
+            ${MODO_ESTUDIANTE ? '' : `
+            <td class="td-acciones">
+                <button class="btn-icon-act btn-editar-act" data-idx="${i}" title="Editar"><i class="ti ti-pencil"></i></button>
+                <button class="btn-icon-act btn-guardar-act oculto" data-idx="${i}" title="Guardar"><i class="ti ti-check"></i></button>
+                <button class="btn-icon-act btn-cancelar-act oculto" data-idx="${i}" title="Cancelar"><i class="ti ti-x"></i></button>
+            </td>`}
+        </tr>
+    `;
+    }
+
+    // ── Alternar entre vista y edición de una fila ──────────────────
+    function alternarEdicionActividad(idx, cancelar = false) {
+        const vHora = document.querySelector(`.act-view-hora[data-idx="${idx}"]`);
+        const eHora = document.querySelector(`.act-edit-hora[data-idx="${idx}"]`);
+        const vLink = document.querySelector(`.act-view-link[data-idx="${idx}"]`);
+        const eLink = document.querySelector(`.act-edit-link[data-idx="${idx}"]`);
+        const bEdit = document.querySelector(`.btn-editar-act[data-idx="${idx}"]`);
+        const bGuardar = document.querySelector(`.btn-guardar-act[data-idx="${idx}"]`);
+        const bCancelar = document.querySelector(`.btn-cancelar-act[data-idx="${idx}"]`);
+
+        if (cancelar) {
+            eHora.value = eHora.dataset.original ?? '';
+            eLink.value = eLink.dataset.original ?? '';
+        }
+
+        [vHora, vLink, bEdit].forEach(el => el.classList.toggle('oculto'));
+        [eHora, eLink, bGuardar, bCancelar].forEach(el => el.classList.toggle('oculto'));
+    }
+
+    // ── Guardar hora + link de clase en Firebase ────────────────────
+    async function guardarActividad(c, idx) {
+        const horaInput = document.querySelector(`.act-edit-hora[data-idx="${idx}"]`);
+        const linkInput = document.querySelector(`.act-edit-link[data-idx="${idx}"]`);
+        const btnGuardar = document.querySelector(`.btn-guardar-act[data-idx="${idx}"]`);
+
+        const horaInicio = horaInput.value.trim();
+        const linkClase = linkInput.value.trim();
+
+        if (linkClase && !esURLValida(linkClase)) {
+            mostrarToast('⚠️ El link de clase no es una URL válida (debe empezar con http:// o https://)');
+            linkInput.focus();
+            return;
+        }
+
+        btnGuardar.disabled = true;
+        try {
+            await actualizarActividad(c.id, idx, { horaInicio, linkClase });
+
+            // Reflejar el cambio en memoria y en la fila sin recargar
+            c.actividades[idx].horaInicio = horaInicio || null;
+            c.actividades[idx].linkClase = linkClase || null;
+
+            document.querySelector(`.act-view-hora[data-idx="${idx}"]`).textContent = horaInicio || '—';
+            document.querySelector(`.act-view-link[data-idx="${idx}"]`).innerHTML = linkClase
+                ? `<a href="${linkClase}" target="_blank" rel="noopener noreferrer" class="link-clase"><i class="ti ti-video"></i> Unirse</a>`
+                : '—';
+
+            horaInput.dataset.original = horaInicio;
+            linkInput.dataset.original = linkClase;
+
+            alternarEdicionActividad(idx);
+            mostrarToast('✅ Actividad actualizada correctamente');
+        } catch (err) {
+            console.error('Error guardando actividad:', err);
+            mostrarToast('❌ No se pudo guardar. Intenta nuevamente.');
+        } finally {
+            btnGuardar.disabled = false;
+        }
+    }
+
+    actualizarBotonGruposCarrera(c);
     document.getElementById('modalOverlay').classList.remove('oculto');
     document.body.style.overflow = 'hidden';
 }
@@ -868,19 +1262,19 @@ document.addEventListener('DOMContentLoaded', () => {
 
 // ── Modal múltiples actividades docente ───────────────────────
 function abrirModalMultiplesDocente(proximasActividades) {
-    document.getElementById('modalHeader').style.background  = '#0a3d7c';
-    document.getElementById('modalHeader').style.color       = '#ffffff';
+    document.getElementById('modalHeader').style.background = '#0a3d7c';
+    document.getElementById('modalHeader').style.color = '#ffffff';
     document.getElementById('modalHeader').style.borderColor = '#030e28';
 
-    document.getElementById('modalBadge').innerHTML              = `<span class="badge vigente">Pendientes</span>`;
-    document.getElementById('modalNombre').textContent           = 'Próximas Actividades';
-    document.getElementById('modalPeriodo').textContent          = 'Resumen de todos tus cronogramas';
-    document.getElementById('modalFechaInicio').textContent      = '—';
-    document.getElementById('modalFechaFin').textContent         = '—';
+    document.getElementById('modalBadge').innerHTML = `<span class="badge vigente">Pendientes</span>`;
+    document.getElementById('modalNombre').textContent = 'Próximas Actividades';
+    document.getElementById('modalPeriodo').textContent = 'Resumen de todos tus cronogramas';
+    document.getElementById('modalFechaInicio').textContent = '—';
+    document.getElementById('modalFechaFin').textContent = '—';
     document.getElementById('modalFechaPublicacion').textContent = '—';
 
     const hoyStr = new Date().toISOString().split('T')[0];
-    const tabla  = document.getElementById('modalTabla');
+    const tabla = document.getElementById('modalTabla');
 
     tabla.innerHTML = `
         <table class="modal-table">
@@ -894,8 +1288,8 @@ function abrirModalMultiplesDocente(proximasActividades) {
             </thead>
             <tbody>
                 ${proximasActividades.map(p => {
-                    const esHoy = p.actividad.fechaInicio === hoyStr;
-                    return `
+        const esHoy = p.actividad.fechaInicio === hoyStr;
+        return `
                     <tr style="${esHoy ? 'background:rgba(0,229,255,0.06);' : ''}">
                         <td>
                             <div style="font-weight:700;color:#1e88e5;line-height:1.3;">
@@ -912,7 +1306,7 @@ function abrirModalMultiplesDocente(proximasActividades) {
                         <td class="td-fecha">${formatearFecha(p.actividad.fechaInicio)}</td>
                         <td class="td-fecha">${formatearFecha(p.actividad.fechaFin)}</td>
                     </tr>`;
-                }).join('')}
+    }).join('')}
             </tbody>
         </table>
     `;

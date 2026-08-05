@@ -620,12 +620,34 @@
         </div>
 
         <div class="excel-info-box">
+          <label class="grupo-modal__label">¿Qué deseas hacer?</label>
+          <div class="timer-options">
+            <button type="button" class="timer-chip selected" id="grupoModoNuevoChip" data-modo="nuevo">Crear grupo nuevo</button>
+            <button type="button" class="timer-chip" id="grupoModoExistenteChip" data-modo="existente">Actualizar grupo existente</button>
+          </div>
+        </div>
+
+        <div class="excel-info-box" id="grupoNombreWrap">
           <label for="grupoNombreInput" class="grupo-modal__label">
             Nombre del grupo
           </label>
           <input type="text" id="grupoNombreInput" class="grupo-modal__input"
             placeholder="Ej: Grupo Ingeniería — Marzo 2026" maxlength="80">
           <div class="grupo-modal__hint">Usa un nombre descriptivo que identifique la cohorte o fecha.</div>
+        </div>
+
+        <div class="excel-info-box" id="grupoExistenteWrap" style="display:none;">
+          <label for="grupoExistenteSelect" class="grupo-modal__label">
+            Selecciona el grupo
+          </label>
+          <select id="grupoExistenteSelect" class="grupo-modal__input">
+            <option value="">-- Seleccionar grupo --</option>
+          </select>
+          <div class="grupo-modal__hint">
+            Los estudiantes nuevos se agregarán al grupo. Los que ya existan (misma cédula) se
+            actualizarán solo con los datos que traigan valor; los campos vacíos no borrarán lo ya guardado,
+            y la asistencia previa del grupo no se modifica.
+          </div>
         </div>
       </div>
 

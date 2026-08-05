@@ -50,10 +50,16 @@ const cancelarGrupoBtn      = $('cancelarGrupoBtn');
 const closeGrupoModalBtn    = $('closeGrupoModalBtn');
 const gruposListContainer   = $('gruposListContainer');
 const gruposEmptyState      = $('gruposEmptyState');
+const grupoModoNuevoChip      = $('grupoModoNuevoChip');
+const grupoModoExistenteChip  = $('grupoModoExistenteChip');
+const grupoNombreWrap         = $('grupoNombreWrap');
+const grupoExistenteWrap      = $('grupoExistenteWrap');
+const grupoExistenteSelect    = $('grupoExistenteSelect');
 
 let listenersGruposIniciados = false;
 let obtenerRegistrosActuales = () => ({});
 let gruposData = {};
+let grupoMigModo = 'nuevo'; // 'nuevo' | 'existente'
 
 const gruposSearchState  = {};
 const gruposCarreraState = {};
@@ -668,44 +674,195 @@ async function prepararCargaExcel() {
    GRUPOS — MIGRACIÓN
 ══════════════════════════════════════════════════════════════ */
 
+function poblarSelectGruposExistentes() {
+  if (!grupoExistenteSelect) return;
+
+  const seleccionPrevia = grupoExistenteSelect.value;
+
+  const opciones = Object.entries(gruposData)
+    .sort((a, b) => (b[1].creadoEn || 0) - (a[1].creadoEn || 0))
+    .map(([key, g]) => {
+      const total = g.totalEstudiantes ?? Object.keys(g.estudiantes || {}).length;
+      return `<option value="${key}">${escHtml(g.nombre || key)} (${total} estudiantes)</option>`;
+    })
+    .join('');
+
+  grupoExistenteSelect.innerHTML = `<option value="">-- Seleccionar grupo --</option>${opciones}`;
+
+  if (seleccionPrevia && gruposData[seleccionPrevia]) {
+    grupoExistenteSelect.value = seleccionPrevia;
+  }
+}
+
+function setGrupoMigModo(modo) {
+  grupoMigModo = modo;
+
+  const esExistente = modo === 'existente';
+
+  if (grupoModoNuevoChip)     grupoModoNuevoChip.classList.toggle('selected', !esExistente);
+  if (grupoModoExistenteChip) grupoModoExistenteChip.classList.toggle('selected', esExistente);
+  if (grupoNombreWrap)        grupoNombreWrap.style.display    = esExistente ? 'none' : 'block';
+  if (grupoExistenteWrap)     grupoExistenteWrap.style.display = esExistente ? 'block' : 'none';
+
+  if (confirmarGrupoBtn) {
+    confirmarGrupoBtn.innerHTML = `
+      <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
+        stroke-linecap="round" stroke-linejoin="round">
+        <path d="M5 12h14M12 5l7 7-7 7"/>
+      </svg>${esExistente ? 'Actualizar grupo' : 'Crear grupo'}`;
+  }
+
+  if (esExistente) {
+    poblarSelectGruposExistentes();
+    setTimeout(() => grupoExistenteSelect?.focus(), 100);
+  } else {
+    setTimeout(() => grupoNombreInput?.focus(), 100);
+  }
+}
+
+function bindGrupoModoToggle() {
+  if (grupoModoNuevoChip && !grupoModoNuevoChip.dataset.binded) {
+    grupoModoNuevoChip.addEventListener('click', () => setGrupoMigModo('nuevo'));
+    grupoModoNuevoChip.dataset.binded = 'true';
+  }
+  if (grupoModoExistenteChip && !grupoModoExistenteChip.dataset.binded) {
+    grupoModoExistenteChip.addEventListener('click', () => setGrupoMigModo('existente'));
+    grupoModoExistenteChip.dataset.binded = 'true';
+  }
+}
+
 function openGrupoModal() {
   const registros = obtenerRegistrosActuales();
   if (!Object.keys(registros).length) { toast('No hay registros de asistencia para migrar.', 'warn'); return; }
   if (grupoNombreInput) grupoNombreInput.value = '';
+  bindGrupoModoToggle();
+  setGrupoMigModo('nuevo');
   if (grupoModalBackdrop) grupoModalBackdrop.style.display = 'flex';
-  setTimeout(() => grupoNombreInput?.focus(), 100);
 }
 
 function closeGrupoModal() {
   if (grupoModalBackdrop) grupoModalBackdrop.style.display = 'none';
 }
 
+/**
+ * Construye el objeto de un estudiante a partir de un registro de asistencia crudo.
+ */
+function construirEstudianteDesdeRegistro(cedula, d) {
+  return {
+    cedula,
+    nombres:    d.nombre || d.nombres || '',
+    carrera:    d.carrera  || '',
+    sede:       d.sede || d.Sede || d.sede_nombre || '',
+    telegram:   d.telegram || '',
+    asistencia: d.asistencia === true
+  };
+}
+
+/**
+ * Combina un estudiante ya existente en un grupo con los datos nuevos que llegan
+ * desde los registros de asistencia.
+ * - Si el campo nuevo viene vacío, se conserva el valor anterior.
+ * - La asistencia NO se sobrescribe: se mantiene la que ya tenía el grupo.
+ * - Esto permite, por ejemplo, agregar "sede" a estudiantes a los que les faltaba
+ *   ese atributo, sin afectar el resto de su información ya guardada.
+ */
+function mergeEstudiante(existente, nuevo) {
+  const merged = { ...existente };
+
+  merged.cedula   = existente.cedula || nuevo.cedula;
+  merged.nombres  = nuevo.nombres  || existente.nombres  || '';
+  merged.carrera  = nuevo.carrera  || existente.carrera  || '';
+  merged.sede     = nuevo.sede     || existente.sede     || '';
+  merged.telegram = nuevo.telegram || existente.telegram || '';
+  merged.asistencia = existente.asistencia === true; // se conserva la del grupo
+
+  return merged;
+}
+
 async function confirmarMigracionGrupo() {
-  const nombre    = grupoNombreInput?.value?.trim();
   const registros = obtenerRegistrosActuales();
-  if (!nombre)                        { toast('Ingresa un nombre para el grupo.', 'warn'); grupoNombreInput?.focus(); return; }
   if (!Object.keys(registros).length) { toast('No hay registros para migrar.', 'warn'); return; }
+
+  const esExistente = grupoMigModo === 'existente';
+
+  const nombre     = esExistente ? '' : grupoNombreInput?.value?.trim();
+  const grupoKeySel = esExistente ? grupoExistenteSelect?.value : '';
+
+  if (!esExistente && !nombre) {
+    toast('Ingresa un nombre para el grupo.', 'warn');
+    grupoNombreInput?.focus();
+    return;
+  }
+
+  if (esExistente && !grupoKeySel) {
+    toast('Selecciona un grupo existente.', 'warn');
+    grupoExistenteSelect?.focus();
+    return;
+  }
 
   if (confirmarGrupoBtn) {
     confirmarGrupoBtn.disabled = true;
-    confirmarGrupoBtn.textContent = 'Migrando…';
+    confirmarGrupoBtn.textContent = esExistente ? 'Actualizando…' : 'Migrando…';
   }
 
   try {
+    if (esExistente) {
+      const grupoActual = gruposData[grupoKeySel];
+      if (!grupoActual) { toast('El grupo seleccionado ya no existe.', 'error'); return; }
+
+      const estudiantesActuales = { ...(grupoActual.estudiantes || {}) };
+      let nuevos = 0;
+      let actualizados = 0;
+
+      for (const [cedula, d] of Object.entries(registros)) {
+        const nuevo = construirEstudianteDesdeRegistro(cedula, d);
+
+        if (estudiantesActuales[cedula]) {
+          estudiantesActuales[cedula] = mergeEstudiante(estudiantesActuales[cedula], nuevo);
+          actualizados++;
+        } else {
+          estudiantesActuales[cedula] = nuevo;
+          nuevos++;
+        }
+      }
+
+      const totalEstudiantes = Object.keys(estudiantesActuales).length;
+
+      await gruposUpdate(gruposRef(gruposDb, `${DB_GRUPOS}/${grupoKeySel}`), {
+        estudiantes: estudiantesActuales,
+        totalEstudiantes,
+        actualizadoEn: Date.now()
+      });
+
+      await userRemove(userRef(userDb, DB_ASIST));
+      await adminRemove(adminRef(adminDb, DB_ADMIN_ESTUDIANTES));
+
+      gruposData[grupoKeySel] = {
+        ...grupoActual,
+        estudiantes: estudiantesActuales,
+        totalEstudiantes,
+        actualizadoEn: Date.now()
+      };
+      renderGrupos(gruposData);
+
+      toast(
+        `Grupo "${grupoActual.nombre || grupoKeySel}" actualizado: ${nuevos} nuevo(s), ${actualizados} actualizado(s).`,
+        'success'
+      );
+      closeGrupoModal();
+
+      const gruposNav = document.querySelector('[data-tab="grupos"]');
+      if (gruposNav) gruposNav.click();
+      return;
+    }
+
     const grupoKey = nombre
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/\s+/g, '_').replace(/[^a-zA-Z0-9_]/g, '').toLowerCase() + '_' + Date.now();
 
     const estudiantes = {};
     for (const [cedula, d] of Object.entries(registros)) {
-      estudiantes[cedula] = {
-        cedula,
-        nombres:    d.nombre || d.nombres || '',
-        carrera:    d.carrera  || '',
-        sede:       d.sede || d.Sede || d.sede_nombre || '',
-        telegram:   d.telegram || '',
-        asistencia: d.asistencia === true
-      };
+      estudiantes[cedula] = construirEstudianteDesdeRegistro(cedula, d);
     }
 
     const grupoPayload = {
@@ -736,7 +893,7 @@ async function confirmarMigracionGrupo() {
         <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"
           stroke-linecap="round" stroke-linejoin="round">
           <path d="M5 12h14M12 5l7 7-7 7"/>
-        </svg>Crear grupo`;
+        </svg>${grupoMigModo === 'existente' ? 'Actualizar grupo' : 'Crear grupo'}`;
     }
   }
 }
