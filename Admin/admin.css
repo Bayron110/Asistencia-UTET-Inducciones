@@ -1890,8 +1890,6 @@ a { text-decoration: none; color: inherit; }
   color: var(--dash-muted); font-size: .83rem;
 }
 
-/* Grupos históricos */
-.dash-grupos-section { }
 
 .dash-grupos-section__header {
   display: flex;
